@@ -1,0 +1,25 @@
+{
+  "name": "memory_insert",
+  "description": "The memory_insert command allows you to insert text at a specific location in a memory block.\n\nExamples:\n        # Update a block containing information about the user (append to the end of the block)\n        memory_insert(label=\"customer\", new_str=\"The customer's ticket number is 12345\")\n\n        # Update a block containing information about the user (insert at the beginning of the block)\n        memory_insert(label=\"customer\", new_str=\"The customer's ticket number is 12345\", insert_line=0)\n\n    Returns:\n        Optional[str]: None is always returned as this function does not produce a response.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string",
+        "description": "Section of the memory to be edited, identified by its label."
+      },
+      "new_str": {
+        "type": "string",
+        "description": "The text to insert. Do not include line number prefixes."
+      },
+      "insert_line": {
+        "type": "integer",
+        "description": "The line number after which to insert the text (0 for beginning of file). Defaults to -1 (end of the file)."
+      }
+    },
+    "required": [
+      "label",
+      "new_str"
+    ]
+  }
+}

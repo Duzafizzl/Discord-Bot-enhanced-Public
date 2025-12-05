@@ -1,0 +1,26 @@
+{
+  "name": "core_memory_replace",
+  "description": "Replace the contents of core memory. To delete memories, use an empty string for new_content.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string",
+        "description": "Section of the memory to be edited."
+      },
+      "old_content": {
+        "type": "string",
+        "description": "String to replace. Must be an exact match."
+      },
+      "new_content": {
+        "type": "string",
+        "description": "Content to write to the memory. All unicode (including emojis) are supported."
+      }
+    },
+    "required": [
+      "label",
+      "old_content",
+      "new_content"
+    ]
+  }
+}

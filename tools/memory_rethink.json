@@ -1,0 +1,21 @@
+{
+  "name": "memory_rethink",
+  "description": "The memory_rethink command allows you to completely rewrite the contents of a memory block. Use this tool to make large sweeping changes (e.g. when you want to condense or reorganize the memory blocks), do NOT use this tool to make small precise edits (e.g. add or remove a line, replace a specific string, etc).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string",
+        "description": "The memory block to be rewritten, identified by its label."
+      },
+      "new_memory": {
+        "type": "string",
+        "description": "The new memory contents with information integrated from existing memory blocks and the conversation context."
+      }
+    },
+    "required": [
+      "label",
+      "new_memory"
+    ]
+  }
+}

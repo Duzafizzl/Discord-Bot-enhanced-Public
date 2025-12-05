@@ -1,0 +1,159 @@
+# ================================
+# 🔒 SECURITY - NEVER COMMIT THESE
+# ================================
+
+# Environment variables (HIGHEST PRIORITY!)
+.env
+.env.*
+*.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# Credentials & Secrets
+*credentials*.json
+*secrets*.json
+*tokens*.json
+*private*.json
+*config.json
+spotify-config.json
+
+# API Keys
+*api-key*
+*apikey*
+*.key
+*.pem
+
+# ================================
+# DEPENDENCIES & BUILD
+# ================================
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+package-lock.json
+.pnp.*
+.yarn/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# TypeScript
+*.tsbuildinfo
+dist/
+build/
+
+# ================================
+# LOGS & RUNTIME
+# ================================
+
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# ================================
+# OS & IDE
+# ================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.vs/
+.cursor/
+
+# ================================
+# PROJECT SPECIFIC
+# ================================
+
+# Backups
+backup-*.sh
+*-backup/
+pi-backup-*/
+*.backup
+*.bak
+*.old
+
+# Compiled JS from TS
+src/**/*.js
+src/**/*.js.map
+!src/archive/*.js
+
+# Test outputs
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Audio files (TTS outputs)
+*.wav
+*.mp3
+*.ogg
+miore-voice-system.tar.gz
+
+# ================================
+# PRIVATE DOCS (deployment specific)
+# ================================
+
+# Personal system prompts
+*_SYSTEM_PROMPT.md
+*_PERSONAL*.md
+
+# Deployment scripts with hardcoded IPs/paths (if any)
+# deploy-to-*.sh  # Uncomment if needed
+
+# ================================
+# SECURITY NOTES
+# ================================
+# 
+# If you accidentally committed a secret:
+# 1. REVOKE the secret immediately (API key, token, etc.)
+# 2. Generate a NEW secret
+# 3. Use git-filter-repo or BFG to remove from history
+# 4. Force push (ONLY if repo is private and you own it)
+#
+# Prevention:
+# - Use .env for ALL secrets
+# - Never hardcode API keys in code
+# - Review diffs before committing
+# - Use pre-commit hooks for secret scanning
+#

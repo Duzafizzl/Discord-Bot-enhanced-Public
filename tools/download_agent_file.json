@@ -1,0 +1,22 @@
+{
+  "name": "download_agent_file",
+  "description": "Downloads the complete agent configuration from Letta and saves it as a .af (Agentfile) file. The .af format contains the complete agent configuration including all tools, memory blocks, sources and MCP servers. Useful for backups, migration or sharing agent configurations.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "agent_id": {
+        "type": "string",
+        "description": "The Letta agent ID (e.g. agent-651dd87e-7c62-4134-831f-d6d62c5ee4ca). If not provided, the current agent ID from the environment is used."
+      },
+      "output_filename": {
+        "type": "string",
+        "description": "Optional: Custom filename for the .af file. If not provided, the agent name is used (e.g. 'MyAgent.af')."
+      },
+      "save_path": {
+        "type": "string",
+        "description": "Optional: Directory where the file should be saved. Default: Current directory."
+      }
+    },
+    "required": []
+  }
+}

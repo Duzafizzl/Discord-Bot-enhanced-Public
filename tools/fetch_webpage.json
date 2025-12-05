@@ -1,0 +1,16 @@
+{
+  "name": "fetch_webpage",
+  "description": "Fetch a webpage and convert it to markdown/text format using Jina AI reader.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "The URL of the webpage to fetch and convert"
+      }
+    },
+    "required": [
+      "url"
+    ]
+  }
+}

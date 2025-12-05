@@ -1,0 +1,43 @@
+{
+  "name": "archival_memory_search",
+  "description": "Search archival memory using semantic similarity to find relevant information.\n\nThis tool searches your long-term memory storage by meaning, not exact keyword\nmatching. Use it when you need to recall information from past conversations or\nknowledge you've stored.\n\nSearch strategy:\n- Query by concept/meaning, not exact phrases\n- Use tags to narrow results when you know the category\n- Start broad, then narrow with tags if needed\n- Results are ranked by semantic relevance\n\nExamples:\n        # Search for project discussions\n        archival_memory_search(\n            query=\"database migration decisions and timeline\",\n            tags=[\"projects\"]\n        )\n\n        # Search meeting notes from Q1\n        archival_memory_search(\n            query=\"roadmap planning discussions\",\n            start_datetime=\"2024-01-01\",\n            end_datetime=\"2024-03-31\",\n            tags=[\"meetings\", \"roadmap\"],\n            tag_match_mode=\"all\"\n        )",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "What you're looking for, described naturally (e.g., \"meetings about API redesign\")"
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Filter to memories with these tags. Use tag_match_mode to control matching."
+      },
+      "tag_match_mode": {
+        "type": "string",
+        "enum": [
+          "any",
+          "all"
+        ],
+        "description": "\"any\" = match memories with ANY of the tags, \"all\" = match only memories with ALL tags"
+      },
+      "top_k": {
+        "type": "integer",
+        "description": "Maximum number of results to return (default: 10)"
+      },
+      "start_datetime": {
+        "type": "string",
+        "description": "Only return memories created after this time (ISO 8601: \"2024-01-15\" or \"2024-01-15T14:30\")"
+      },
+      "end_datetime": {
+        "type": "string",
+        "description": "Only return memories created before this time (ISO 8601 format)"
+      }
+    },
+    "required": [
+      "query"
+    ]
+  }
+}

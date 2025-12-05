@@ -1,0 +1,23 @@
+{
+  "name": "archival_memory_insert",
+  "description": "Add information to long-term archival memory for later retrieval.\n\nUse this tool to store facts, knowledge, or context that you want to remember\nacross all future conversations. Archival memory is permanent and searchable by\nsemantic similarity.\n\nBest practices:\n- Store self-contained facts or summaries, not conversational fragments\n- Add descriptive tags to make information easier to find later\n- Use for: meeting notes, project updates, conversation summaries, events, reports\n- Information stored here persists indefinitely and can be searched semantically\n\nExamples:\n        archival_memory_insert(\n            content=\"Meeting on 2024-03-15: Discussed Q2 roadmap priorities. Decided to focus on performance optimization and API v2 release. John will lead the optimization effort.\",\n            tags=[\"meetings\", \"roadmap\", \"q2-2024\"]\n        )",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "The information to store. Should be clear and self-contained."
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional list of category tags (e.g., [\"meetings\", \"project-updates\"])"
+      }
+    },
+    "required": [
+      "content"
+    ]
+  }
+}

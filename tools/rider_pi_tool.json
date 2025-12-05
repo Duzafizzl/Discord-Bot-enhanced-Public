@@ -1,0 +1,91 @@
+{
+  "name": "rider_pi_tool",
+  "description": "🤖 Steuert den Rider Pi Roboter! Kann einzelne Actions ODER ganze Sequenzen ausführen. Demo-Bewegungen: happy_dance, glueckliches_wackeln, achten_fahren, kreis_drehen. Erweiterte Steuerung: adjust_height, periodic_shake, balance_mode. Für mehrere Actions hintereinander: action='sequence' mit sequence-Liste verwenden! WICHTIG: Commands brauchen ein paar Sekunden da sie über Discord → Bot → SSH → Robot laufen.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "glueckliches_wackeln",
+          "auf_und_ab_wackeln",
+          "vor_und_zurueck_rollen",
+          "achten_fahren",
+          "kreis_drehen",
+          "happy_dance",
+          "adjust_height",
+          "adjust_roll",
+          "balance_mode",
+          "periodic_squat",
+          "periodic_shake",
+          "reset",
+          "test_connection",
+          "sequence",
+          "list_actions"
+        ],
+        "description": "Einzelne Action ODER 'sequence' für mehrere Actions hintereinander. Demo-Bewegungen: glueckliches_wackeln, auf_und_ab_wackeln, vor_und_zurueck_rollen, achten_fahren, kreis_drehen, happy_dance. Steuerung: adjust_height, adjust_roll, balance_mode, periodic_squat, periodic_shake, reset. Batch: sequence (braucht sequence-Liste), list_actions"
+      },
+      "height": {
+        "type": "integer",
+        "minimum": 75,
+        "maximum": 115,
+        "description": "Höhe in mm für 'adjust_height' (75-115, Standard: 85)"
+      },
+      "roll": {
+        "type": "integer",
+        "minimum": -17,
+        "maximum": 17,
+        "description": "Roll-Winkel in Grad für 'adjust_roll' (-17 bis 17, 0 = neutral)"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "True/False für 'balance_mode' (Selbststabilisierung)"
+      },
+      "period": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 4.0,
+        "description": "Periodendauer in Sekunden für 'periodic_squat' oder 'periodic_shake' (0.0-4.0, 0=stop)"
+      },
+      "sequence": {
+        "type": "array",
+        "description": "Liste von Actions für 'sequence'. Jedes Element ist ein Objekt mit 'action' und optionalen Parametern. Beispiel: [{\"action\": \"happy_dance\"}, {\"action\": \"adjust_height\", \"height\": 100}, {\"action\": \"reset\"}]",
+        "items": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Name der Action"
+            },
+            "height": {
+              "type": "integer",
+              "description": "Für adjust_height"
+            },
+            "roll": {
+              "type": "integer",
+              "description": "Für adjust_roll"
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Für balance_mode"
+            },
+            "period": {
+              "type": "number",
+              "description": "Für periodic_squat/shake"
+            }
+          },
+          "required": ["action"]
+        }
+      },
+      "delay_between": {
+        "type": "number",
+        "default": 1.0,
+        "minimum": 0.0,
+        "maximum": 10.0,
+        "description": "Pause in Sekunden zwischen Actions in einer Sequenz (Standard: 1.0)"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  }
+}

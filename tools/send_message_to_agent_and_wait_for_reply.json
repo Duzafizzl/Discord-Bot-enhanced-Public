@@ -1,0 +1,21 @@
+{
+  "name": "send_message_to_agent_and_wait_for_reply",
+  "description": "Sends a message to a specific Letta agent within the same organization and waits for a response. The sender's identity is automatically included, so no explicit introduction is needed in the message. This function is designed for two-way communication where a reply is expected.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "The content of the message to be sent to the target agent."
+      },
+      "other_agent_id": {
+        "type": "string",
+        "description": "The unique identifier of the target Letta agent."
+      }
+    },
+    "required": [
+      "message",
+      "other_agent_id"
+    ]
+  }
+}

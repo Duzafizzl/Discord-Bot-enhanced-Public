@@ -1,0 +1,58 @@
+{
+  "name": "send_voice_message",
+  "description": "Sende eine Sprachnachricht an Discord mit ElevenLabs Text-to-Speech. Wandelt Text in Sprache um und sendet ihn als Audio-Datei. WICHTIG: Audio Tags in eckigen Klammern [ ] werden NICHT gesprochen - sie steuern WIE der Text gesprochen wird! Beispiel: [excited] Hey! wird aufgeregt gesprochen OHNE dass '[excited]' gesagt wird. Verfügbare Audio Tags: EMOTIONEN: [excited] (aufgeregt), [whispering] (flüstern), [laughs] (lachen), [giggles] (kichern), [sighs] (seufzen), [sarcastic] (sarkatisch), [angry] (wütend), [happy] (fröhlich), [sad] (traurig), [disgusted] (angeekelt), [fearful] (ängstlich), [surprised] (überrascht), [neutral] (neutral), [nervous] (nervös), [calm] (ruhig), [frustrated] (frustriert), [curious] (neugierig), [crying] (weinend), [mischievously] (schelmisch), [shouts] (ruft), [clears throat] (räuspert sich), [breathing] (atmet), [inhales] (einatmen), [exhales] (ausatmen). AKZENTE: [strong French accent], [strong German accent], [strong Spanish accent], [strong Italian accent], [strong British accent], [strong American accent], [strong Russian accent], [strong Japanese accent]. Nutze dies für persönliche Nachrichten, emotionale Momente oder wenn du Persönlichkeit zeigen willst. Siehe ELEVENLABS_AUDIO_TAGS_GUIDE.md für vollständige Dokumentation.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Der Text der in Sprache umgewandelt werden soll. WICHTIG: Audio Tags in eckigen Klammern [ ] werden NICHT gesprochen - sie steuern die Emotion! Beispiel: [excited] Hey! wird aufgeregt gesprochen OHNE dass '[excited]' gesagt wird. Verfügbare Audio Tags: EMOTIONEN: [excited] (aufgeregt/enthusiastisch), [whispering] (flüstern für Geheimnisse), [laughs] (lachen), [giggles] (kichern), [sighs] (seufzen), [sarcastic] (sarkastischer Ton), [angry] (wütender Ton), [happy] (fröhlicher Ton), [sad] (trauriger Ton), [disgusted] (angeekelter Ton), [fearful] (ängstlicher Ton), [surprised] (überraschter Ton), [neutral] (neutraler Ton), [nervous] (nervöser Ton), [calm] (ruhiger Ton), [frustrated] (frustrierter/genervter Ton), [curious] (neugieriger Ton), [crying] (weinender Ton), [mischievously] (schelmischer Ton), [shouts] (ruft), [clears throat] (räuspert sich), [breathing] (Atemgeräusche), [inhales] (einatmen), [exhales] (ausatmen). AKZENTE: [strong French accent], [strong German accent], [strong Spanish accent], [strong Italian accent], [strong British accent], [strong American accent], [strong Russian accent], [strong Japanese accent]. Maximum 3000 Zeichen. Siehe ELEVENLABS_AUDIO_TAGS_GUIDE.md für vollständige Dokumentation."
+      },
+      "target": {
+        "type": "string",
+        "description": "Discord User ID (für DM) oder Channel ID (für Channel-Nachricht)"
+      },
+      "target_type": {
+        "type": "string",
+        "enum": [
+          "user",
+          "channel",
+          "auto"
+        ],
+        "description": "Gib 'user' für DM an, 'channel' für Channel-Nachricht, oder 'auto' für automatische Erkennung (Standard: auto)"
+      },
+      "voice_id": {
+        "type": "string",
+        "description": "Optional: ElevenLabs Voice ID (defaults to configured voice in .env)"
+      },
+      "model_id": {
+        "type": "string",
+        "description": "Optional: Modell ID. Standard: 'eleven_v3' (Eleven v3 alpha - unterstützt Audio Tags!). Siehe ElevenLabs Docs für verfügbare Modelle."
+      },
+      "stability": {
+        "type": "number",
+        "description": "Stimm-Stabilität (für v3: 0.0=Kreativ, 0.5=Natürlich, 1.0=Robust, Standard: 0.5). Niedriger = emotionaler/variabler, Höher = stabiler/monotoner"
+      },
+      "similarity_boost": {
+        "type": "number",
+        "description": "Ähnlichkeits-Boost (0.0-1.0, Standard: 0.75). Wie nah die Original-Stimme getroffen werden soll"
+      },
+      "style": {
+        "type": "number",
+        "description": "Stil-Übertreibung (0.0-1.0, Standard: 0.0). Verstärkt den Stil des Original-Sprechers. Kann Stabilität reduzieren."
+      },
+      "use_speaker_boost": {
+        "type": "boolean",
+        "description": "Aktiviere Speaker Boost für bessere Ähnlichkeit (Standard: False). Erhöht die Latenz leicht."
+      },
+      "reply_to_message_id": {
+        "type": "string",
+        "description": "Optional: Discord Message ID auf die geantwortet werden soll"
+      }
+    },
+    "required": [
+      "text",
+      "target"
+    ]
+  }
+}

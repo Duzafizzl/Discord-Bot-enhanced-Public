@@ -1,0 +1,21 @@
+{
+  "name": "core_memory_append",
+  "description": "Append to the contents of core memory.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string",
+        "description": "Section of the memory to be edited."
+      },
+      "content": {
+        "type": "string",
+        "description": "Content to write to the memory. All unicode (including emojis) are supported."
+      }
+    },
+    "required": [
+      "label",
+      "content"
+    ]
+  }
+}
