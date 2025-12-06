@@ -603,21 +603,23 @@ async function forwardImagesToGrok(
         ? `${contextPrefix} ${userText}`
         : `${contextPrefix} Describe the image(s).`;
 
-      // Extract base64 strings from the image objects (Ollama format expects simple array of base64 strings)
+      // Extract base64 strings from the image objects
+      // nate_api_substrate uses Ollama-style API format (images as array of base64 strings)
       const base64Strings = base64Images.map((img: any) => img.source.data);
 
-      // ✅ Use Ollama-compatible format: images array + content string
-      const payloadOllama: any = {
+      // ✅ Build request payload using nate_api_substrate's API format
+      // Format: images array + content string (Ollama-style specification)
+      const payload: any = {
         messages: [
           {
             role: 'user',
             content: textContent,
-            images: base64Strings  // Ollama expects images as array of base64 strings
+            images: base64Strings  // Array of base64-encoded image strings
           }
         ]
       };
 
-      console.log(`🔍 [DEBUG] Payload built (Ollama format), calling Grok API with streaming...`);
+      console.log(`🔍 [DEBUG] Payload built, sending to nate_api_substrate with streaming...`);
 
       // 📊 CREDIT TRACKING: Log image attachment call
       console.log(`
@@ -635,7 +637,7 @@ async function forwardImagesToGrok(
 
       try {
         for await (const chunk of grokClient.chatStream({
-          messages: payloadOllama.messages,
+          messages: payload.messages,
           session_id: sessionId,
         })) {
           console.log(`📦 [STREAM CHUNK] Event: ${chunk.event}`);
