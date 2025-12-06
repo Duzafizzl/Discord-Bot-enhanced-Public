@@ -296,8 +296,9 @@ async function triggerLetta(task, client) {
                 catch { }
             }
         }
-        // Send task to Letta via messages.ts infrastructure (streaming, chunking, error handling)
-        const taskResponse = await (0, messages_1.sendTaskMessage)(task, targetChannel, client);
+        // Send task to Grok via messages.ts infrastructure
+        const taskPrompt = typeof task === 'string' ? task : task.content || task.task || taskName;
+        const taskResponse = await (0, messages_1.sendTaskMessage)(taskName, taskPrompt);
         // 🔧 FIX: Check if we got a response from Letta
         if (!taskResponse || taskResponse.trim() === "") {
             console.warn(`🗓️  ⚠️  [${new Date().toISOString()}] Task triggered but Letta sent NO response: "${taskName}" (msg_id=${taskMsgId})`);

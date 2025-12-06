@@ -1,0 +1,47 @@
+[Unit]
+Description=Discord Grok Bot
+Documentation=https://github.com/clotho2/wolfe-discord-bot-enhanced
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=your_username
+Group=your_username
+WorkingDirectory=/path/to/wolfe-discord-bot-enhanced
+
+# Environment file (contains all secrets)
+EnvironmentFile=/path/to/wolfe-discord-bot-enhanced/.env
+
+# Start command - use npm start
+ExecStart=/usr/bin/npm start
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=3
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/path/to/wolfe-discord-bot-enhanced/logs
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=discord-grok-bot
+
+# Resource limits (optional - adjust as needed)
+# MemoryMax=2G
+# CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

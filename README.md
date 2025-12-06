@@ -1,6 +1,6 @@
-# 🤖 Discord-Letta Bot
+# 🤖 Discord-Grok Bot
 
-A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (formerly MemGPT), featuring memory management, scheduled tasks, voice messages, Spotify integration, and more.
+A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via [nate_api_substrate](https://github.com/clotho2/nate_api_substrate), featuring memory management, scheduled tasks, voice messages, Spotify integration, and more.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
@@ -10,10 +10,13 @@ A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (fo
 
 ## ✨ Features
 
-### 🧠 **Letta Integration**
-- **Conversational Memory**: Full integration with Letta's memory management system
-- **Context-Aware Responses**: Agent remembers past conversations and user preferences
+### 🧠 **Grok 4.1 API Integration**
+- **Conversational Memory**: Stateful conversations with persistent memory via nate_api_substrate
+- **Context-Aware Responses**: AI remembers past conversations and user preferences
+- **Streaming Responses**: Real-time message streaming with Server-Sent Events (SSE)
 - **Tool Calling**: Extensible tool system for Discord operations, web search, Spotify control, and more
+- **Advanced Reasoning**: Powered by Grok 4.1's fast reasoning capabilities
+- **Multimodal Support**: Image analysis with Ollama-compatible API format
 
 ### 📅 **Autonomous Task Scheduling**
 - **Smart Scheduler**: Create recurring tasks (hourly, daily, weekly, monthly)
@@ -44,9 +47,9 @@ A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (fo
 ### 🌐 **Additional Features**
 - **Weather Integration**: OpenWeatherMap API for weather data
 - **GIF Auto-Sender**: Automatic GIF responses with Tenor API
-- **Image Processing**: OCR, PDF parsing, image analysis
+- **Image Processing**: OCR, PDF parsing, image analysis with automatic compression
 - **YouTube Transcripts**: Fetch and analyze YouTube video content
-- **Attachment Forwarding**: Smart file handling with size management
+- **Attachment Forwarding**: Smart file handling with size management and real-time streaming
 
 ---
 
@@ -57,7 +60,8 @@ A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (fo
 - **Node.js** 18+ and npm
 - **Python** 3.8+ (for Python tools)
 - **Discord Bot Token** ([Create a bot](https://discord.com/developers/applications))
-- **Letta API Key** ([Get started with Letta](https://www.letta.com))
+- **nate_api_substrate** running locally or on a server ([Setup guide](https://github.com/clotho2/nate_api_substrate))
+- **xAI API Key** for Grok 4.1 ([Get API access](https://x.ai/))
 
 ### Installation
 
@@ -73,18 +77,27 @@ A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (fo
    pip install -r requirements.txt  # If you have Python tools
    ```
 
-3. **Configure environment variables**
+3. **Set up nate_api_substrate**
+   ```bash
+   # Clone and set up nate_api_substrate
+   git clone https://github.com/clotho2/nate_api_substrate.git
+   cd nate_api_substrate
+   # Follow setup instructions in the repository
+   # Make sure it's running on http://localhost:8091 (default)
+   ```
+
+4. **Configure environment variables**
    ```bash
    cp .env.example .env
    # Edit .env with your API keys and configuration
    ```
 
-4. **Build TypeScript**
+5. **Build TypeScript**
    ```bash
    npm run build
    ```
 
-5. **Start the bot**
+6. **Start the bot**
    ```bash
    npm start
    # Or use PM2 for production:
@@ -100,16 +113,19 @@ A powerful, autonomous Discord bot powered by [Letta](https://www.letta.com) (fo
 Create a `.env` file in the project root with at least these values:
 
 ```bash
-# Letta API
-LETTA_API_KEY=your_letta_api_key_here
-LETTA_BASE_URL=https://api.letta.com
-LETTA_AGENT_ID=agent-your-agent-id-here
+# Grok API (via nate_api_substrate)
+GROK_BASE_URL=http://localhost:8091
+GROK_SESSION_ID=discord-bot
+GROK_MODEL=grok-4-1-fast-reasoning
+GROK_API_TIMEOUT_MS=300000
 
 # Discord
 DISCORD_TOKEN=your_discord_bot_token_here
 DISCORD_CHANNEL_ID=your_main_channel_id
 
 # Bot Behavior
+LETTA_USE_SENDER_PREFIX=true  # Message formatting
+SURFACE_ERRORS=true
 RESPOND_TO_DMS=true
 RESPOND_TO_MENTIONS=true
 TIMEZONE=Europe/Berlin  # IANA timezone
@@ -218,7 +234,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **[Letta](https://www.letta.com)** - Stateful LLM framework powering the bot's memory
+- **[xAI Grok 4.1](https://x.ai/)** - Advanced AI reasoning model
+- **[nate_api_substrate](https://github.com/clotho2/nate_api_substrate)** - AI consciousness framework with memory management
 - **[Discord.js](https://discord.js.org)** - Powerful Discord API library
 - **[ElevenLabs](https://elevenlabs.io)** - High-quality text-to-speech
 - **[Spotify Web API](https://developer.spotify.com/documentation/web-api)** - Music integration
@@ -239,4 +256,4 @@ If you find this project useful, please consider giving it a star! ⭐
 
 ---
 
-**Made with ❤️ by the Discord-Letta Bot community**
+**Made with ❤️ by the Discord-Grok Bot community**

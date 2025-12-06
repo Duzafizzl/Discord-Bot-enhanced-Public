@@ -1,8 +1,8 @@
 import { Client, Events } from "discord.js";
-import { LettaClient } from "@letta-ai/letta-client";
+import { GrokClient } from "./grokClient";
 import axios from "axios";
 
-// ===== CHUNKING UTILITIES (for long Letta responses) =====
+// ===== CHUNKING UTILITIES (for long Grok responses) =====
 function chunkText(text: string, limit: number): string[] {
   const chunks: string[] = [];
   let i = 0;
@@ -60,12 +60,12 @@ const ALLOWED_IMAGE_DOMAINS = [
 ];
 const MAX_IMAGES_PER_MESSAGE = 10; // Discord's limit
 const MAX_IMAGE_DOWNLOAD_SIZE = 25 * 1024 * 1024; // 25MB
-const REQUEST_TIMEOUT = 90000; // 90s (increased for large base64 uploads to Letta)
+const REQUEST_TIMEOUT = 90000; // 90s (increased for large base64 uploads to Grok)
 const SAFE_TARGET_BYTES = 4 * 1024 * 1024; // 4MB safe target
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB absolute limit
 
-// CRITICAL: Letta API has 2000px dimension limit for multi-image requests!
-const LETTA_MAX_DIMENSION = 2000; // px - any dimension exceeding this will cause 400 error
+// Note: Using 2000px dimension limit for multi-image requests (safe default)
+const MAX_DIMENSION = 2000; // px - safe dimension limit for multimodal requests
 
 // Rate limiting map: userId -> timestamp
 const processingUsers = new Map<string, number>();
@@ -140,7 +140,7 @@ function extractAssistantText(ns: any): string {
 }
 
 /**
- * Registers a listener that forwards image attachments to Letta Cloud
+ * Registers a listener that forwards image attachments to Grok API (via nate_api_substrate)
  * and replies with the agent response in the same thread.
  */
 export function registerAttachmentForwarder(client: Client) {
@@ -293,7 +293,7 @@ export function registerAttachmentForwarder(client: Client) {
       }).format(now);
       const timestamp = `${weekday}, ${timeOnly}`;
       
-      const reply = await forwardImagesToLetta(urls, userId, userName, channelInfo, timestamp, userText, processingReply, msg);
+      const reply = await forwardImagesToGrok(urls, userId, userName, channelInfo, timestamp, userText, processingReply, msg);
       
       if (reply && reply.trim()) {
         // CHUNKING: Split long responses to avoid Discord's 2000 char limit
@@ -307,7 +307,7 @@ export function registerAttachmentForwarder(client: Client) {
           await msg.reply(reply);
         }
       } else {
-        console.warn('[Letta] Empty reply received, not sending message');
+        console.warn('[Grok] Empty reply received, not sending message');
       }
     } catch (err) {
       console.error("[AttachmentForwarder] Image processing failed:", err instanceof Error ? err.message : err, err);
@@ -316,12 +316,12 @@ export function registerAttachmentForwarder(client: Client) {
       let userMessage = "❌ Couldn't process image(s).";
       const errMsg = err instanceof Error ? err.message : String(err);
       
-      if (errMsg.includes('LETTA_AGENT_ID') || errMsg.includes('LETTA_API_KEY')) {
+      if (errMsg.includes('GROK_BASE_URL') || errMsg.includes('GROK_SESSION_ID')) {
         userMessage += " (Bot configuration error - please contact admin)";
       } else if (errMsg.includes('timeout') || errMsg.includes('ETIMEDOUT')) {
         userMessage += " (Network timeout - please try again later)";
       } else if (errMsg.includes('ECONNREFUSED') || errMsg.includes('network')) {
-        userMessage += " (Connection error - Letta API unreachable)";
+        userMessage += " (Connection error - Grok API unreachable)";
       } else if (errMsg.includes('401') || errMsg.includes('403')) {
         userMessage += " (API authentication failed - please contact admin)";
       } else if (errMsg.includes('429')) {
@@ -395,7 +395,7 @@ async function compressImage(buffer: Buffer, mediaType: string, index: number, t
 
   const originalWidth = metadata?.width || 0;
   const originalHeight = metadata?.height || 0;
-  const exceedsDimensions = originalWidth > LETTA_MAX_DIMENSION || originalHeight > LETTA_MAX_DIMENSION;
+  const exceedsDimensions = originalWidth > MAX_DIMENSION || originalHeight > MAX_DIMENSION;
 
   console.log(`📐 [${index + 1}/${total}] Original: ${originalWidth}x${originalHeight}px, ${Math.round(buffer.length / 1024)}KB`);
 
@@ -406,8 +406,8 @@ async function compressImage(buffer: Buffer, mediaType: string, index: number, t
   }
 
   let buf = buffer;
-  // Start with Letta-safe dimensions
-  let width = Math.min(LETTA_MAX_DIMENSION, originalWidth);
+  // Start with safe dimensions
+  let width = Math.min(MAX_DIMENSION, originalWidth);
   let quality = 70;
   let fmt: 'webp' | 'jpeg' = 'webp';
   let attempts = 0;
@@ -433,9 +433,9 @@ async function compressImage(buffer: Buffer, mediaType: string, index: number, t
       mediaType = fmt === 'webp' ? 'image/webp' : 'image/jpeg';
       
       // After first resize, dimensions are fixed
-      if (needsResize && width <= LETTA_MAX_DIMENSION) {
+      if (needsResize && width <= MAX_DIMENSION) {
         needsResize = false;
-        console.log(`✅ [${index + 1}/${total}] Dimensions now within Letta limit (${width}px)`);
+        console.log(`✅ [${index + 1}/${total}] Dimensions now within safe limit (${width}px)`);
       }
 
       if (buf.length > SAFE_TARGET_BYTES) {
@@ -470,7 +470,7 @@ async function compressImage(buffer: Buffer, mediaType: string, index: number, t
   return { buffer: buf, mediaType };
 }
 
-async function forwardImagesToLetta(
+async function forwardImagesToGrok(
   urls: string[],
   userId: string,
   userName: string,
@@ -478,21 +478,16 @@ async function forwardImagesToLetta(
   timestamp: string,
   userText?: string,
   statusMessage: any = null,
-  discordMessage: any = null // 🔥 NEW: Direct access to Discord message for real-time sending
+  discordMessage: any = null // Direct access to Discord message for real-time sending
 ): Promise<string> {
-  const token = process.env.LETTA_API_KEY || process.env.LETTA_KEY || '';
-  const baseUrl = (process.env.LETTA_BASE_URL || process.env.LETTA_API || 'https://api.letta.com').replace(/\/$/, '');
-  const agentId = process.env.LETTA_AGENT_ID || process.env.AGENT_ID || '';
-  
-  if (!agentId || !token) {
-    throw new Error("LETTA_AGENT_ID and LETTA_API_KEY (or AGENT_ID/LETTA_KEY) must be set");
-  }
+  const baseUrl = process.env.GROK_BASE_URL || 'http://localhost:8091';
+  const sessionId = process.env.GROK_SESSION_ID || 'discord-bot';
 
-  const client = new LettaClient({ 
-    token, 
+  const grokClient = new GrokClient({
     baseUrl,
+    sessionId,
     timeout: REQUEST_TIMEOUT  // 90s timeout for image uploads
-  } as any);
+  });
 
   // 🔧 Direct base64 upload (URL upload had reliability issues)
   console.log(`📦 Processing ${urls.length} image(s) via base64 upload, hasText=${!!(userText && userText.trim())}`);
@@ -515,7 +510,7 @@ async function forwardImagesToLetta(
 
       let { buffer, mediaType } = downloaded;
 
-      // CRITICAL: ALWAYS check dimensions (Letta 2000px limit!) even for single images
+      // CRITICAL: ALWAYS check dimensions (2000px safe limit) even for single images
       const isMultiImage = urls.length > 1;
       // Force dimension check for ALL images (not just multi-image)
       const needsCompression = buffer.length > SAFE_TARGET_BYTES || true; // Always check!
@@ -575,10 +570,10 @@ async function forwardImagesToLetta(
           const baseMsg = urls.length === 1 
             ? "🖼️ Verarbeite dein Bild..." 
             : `🖼️ Verarbeite deine ${urls.length} Bilder...`;
-          const compressMsg = compressedCount === 1 
-            ? "✅ 1 Bild komprimiert" 
+          const compressMsg = compressedCount === 1
+            ? "✅ 1 Bild komprimiert"
             : `✅ ${compressedCount} Bilder komprimiert`;
-          await statusMessage.edit(`${baseMsg}\n${compressMsg}\n📤 Sende an Letta...`);
+          await statusMessage.edit(`${baseMsg}\n${compressMsg}\n📤 Sende an Grok...`);
           console.log(`🔍 [DEBUG] Status message updated successfully`);
         } catch (err) {
           console.warn('[Status] Could not update final status:', err instanceof Error ? err.message : err);
@@ -601,193 +596,115 @@ async function forwardImagesToLetta(
       }
 
       console.log(`🔍 [DEBUG] Building payload for ${base64Images.length} image(s)...`);
-      
+
       // Build context message with user and channel info
       const contextPrefix = `[${userName} (id=${userId}, time=${timestamp}) sent ${base64Images.length} image(s) in ${channelInfo}]`;
       const textContent = userText && userText.trim()
         ? `${contextPrefix} ${userText}`
         : `${contextPrefix} Describe the image(s).`;
-      
-      const payloadB64: any = {
+
+      // Extract base64 strings from the image objects (Ollama format expects simple array of base64 strings)
+      const base64Strings = base64Images.map((img: any) => img.source.data);
+
+      // ✅ Use Ollama-compatible format: images array + content string
+      const payloadOllama: any = {
         messages: [
           {
             role: 'user',
-            content: [
-              ...base64Images,
-              { type: 'text', text: textContent }
-            ]
+            content: textContent,
+            images: base64Strings  // Ollama expects images as array of base64 strings
           }
         ]
       };
 
-      console.log(`🔍 [DEBUG] Payload built, calling Letta API (STREAMING)...`);
-      
+      console.log(`🔍 [DEBUG] Payload built (Ollama format), calling Grok API with streaming...`);
+
       // 📊 CREDIT TRACKING: Log image attachment call
       console.log(`
 ╔══════════════════════════════════════
-║ 📤 LETTA CALL (IMAGE ATTACHMENT)
+║ 📤 GROK CALL (IMAGE ATTACHMENT)
 ║ Time: ${timestamp}
 ║ Reason: image_attachment
 ║ Images: ${base64Images.length}
 ║ User: ${userName}
 ╚══════════════════════════════════════`);
-      
-      // ✅ STREAMING API (wie gestern - funktioniert!)
-      const response: any = await (client as any).agents.messages.createStream(agentId, payloadB64 as any);
-      console.log(`🔍 [DEBUG] Stream started, collecting chunks...`);
+
+      // ✅ Call Grok API with STREAMING for real-time responses
       let text2 = '';
-      let hasSentViaToolCall = false; // 🔥 Track if we already sent via send_message tool call OR assistant_message
-      
-      // 🔥 NEW (Oct 24, 2025): Helper to send messages immediately to Discord
-      const sendAsyncMessage = async (content: string) => {
-        if (discordMessage && content.trim()) {
-          try {
-            const DISCORD_LIMIT = 1900;
-            if (content.length > DISCORD_LIMIT) {
-              console.log(`📦 [AttachmentForwarder] Message is ${content.length} chars, chunking...`);
-              const chunks = chunkText(content, DISCORD_LIMIT);
-              for (const chunk of chunks) {
-                await discordMessage.channel.send(chunk);
-                await new Promise(r => setTimeout(r, 500));
-              }
-            } else {
+      let hasSentContent = false;
+
+      try {
+        for await (const chunk of grokClient.chatStream({
+          messages: payloadOllama.messages,
+          session_id: sessionId,
+        })) {
+          console.log(`📦 [STREAM CHUNK] Event: ${chunk.event}`);
+
+          // Handle different chunk types
+          if (chunk.event === 'thinking' && chunk.data) {
+            const content = typeof chunk.data === 'string' ? chunk.data : chunk.data.content || '';
+            console.log(`💭 [THINKING] ${content.substring(0, 100)}...`);
+          } else if (chunk.event === 'content' && chunk.data) {
+            const content = typeof chunk.data === 'string' ? chunk.data : chunk.data.content || '';
+            console.log(`💬 [CONTENT] ${content.substring(0, 100)}...`);
+            text2 += content;
+
+            // Send content immediately to Discord
+            if (discordMessage && content.trim()) {
               await discordMessage.channel.send(content);
+              hasSentContent = true;
             }
-          } catch (error) {
-            console.error('❌ [AttachmentForwarder] Error sending async message:', error);
+          } else if (chunk.event === 'tool_call' && chunk.data) {
+            const toolName = chunk.data.name || 'unknown';
+            const toolArgs = chunk.data.arguments || {};
+            console.log(`🔧 [TOOL CALL] ${toolName}(${JSON.stringify(toolArgs).substring(0, 100)}...)`);
+
+            // Send tool call info to Discord
+            if (discordMessage) {
+              const toolMessage = `**🔧 Tool: ${toolName}**`;
+              await discordMessage.channel.send(toolMessage);
+            }
+          } else if (chunk.event === 'done') {
+            console.log(`✅ [STREAM DONE] Total content: ${text2.length} chars`);
+
+            // Log token usage if available
+            if (chunk.data && chunk.data.tokens) {
+              const tokens = chunk.data.tokens;
+              console.log(`📊 Tokens: ${tokens.prompt} prompt + ${tokens.completion} completion = ${tokens.total} total`);
+            }
           }
         }
-      };
-      
-      // 🔄 Stream mit Error-Handling (terminated/socket errors)
-      try {
-        for await (const chunk of response) {
-            // 🔍 LOG ALL CHUNKS COMPLETELY to debug send_message issue
-            console.log(`📦 [CHUNK] FULL:`, JSON.stringify(chunk, null, 2).substring(0, 1000));
-            
-            if (chunk.messageType === 'assistant_message') {
-                console.log(`💬 [ASSISTANT_MESSAGE] Received: "${chunk.content.substring(0, 100)}..." (${chunk.content.length} chars)`);
-                text2 += chunk.content;
-                console.log(`💬 [ASSISTANT_MESSAGE] Total collected: ${text2.length} chars`);
-                
-                // 🔥 NEW (Oct 24, 2025): Send assistant messages IMMEDIATELY to Discord!
-                // This allows the bot to write text between tool calls and have it show up in real-time
-                if (discordMessage && chunk.content.trim()) {
-                  console.log(`💬 [ASSISTANT_MESSAGE] Sending immediately to Discord (${chunk.content.length} chars)`);
-                  await sendAsyncMessage(chunk.content);
-                  hasSentViaToolCall = true; // Mark as sent so we don't duplicate at the end
-                }
-            }
-            // 🔥 EXTRACT message from send_message tool call!
-            else if (chunk.messageType === 'tool_call_message' && chunk.toolCall?.name === 'send_message') {
-                try {
-                    const args = JSON.parse(chunk.toolCall.arguments);
-                    if (args.message) {
-                        console.log(`📤 [SEND_MESSAGE TOOL] Detected tool call with message: "${args.message.substring(0, 100)}..." (${args.message.length} chars)`);
-                        text2 += args.message;
-                        
-                        // 🔥 NEW (Oct 24, 2025): Send send_message tool call immediately too!
-                        if (discordMessage) {
-                          console.log('📤 [SEND_MESSAGE TOOL] Sending to Discord now...');
-                          await sendAsyncMessage(args.message);
-                          hasSentViaToolCall = true;
-                          console.log('✅ [SEND_MESSAGE TOOL] Successfully sent via tool call - will suppress duplicate at end');
-                        }
-                    }
-                } catch (e) {
-                    console.error('❌ Failed to parse send_message arguments:', e);
-                }
-            }
-            // 🔥 NEW (Oct 24, 2025): Show OTHER tool calls in Discord with arguments (compact format)
-            else if (chunk.messageType === 'tool_call_message' && chunk.toolCall) {
-                try {
-                    const toolName = chunk.toolCall.name || 'unknown_tool';
-                    let toolMessage = `**Tool Call (${toolName})**`;
-                    
-                    // Parse and format arguments (truncate long text fields, limit total length)
-                    if (chunk.toolCall.arguments) {
-                        const args = typeof chunk.toolCall.arguments === 'string' 
-                            ? JSON.parse(chunk.toolCall.arguments) 
-                            : chunk.toolCall.arguments;
-                        
-                        // Format arguments: truncate long text fields, keep others full
-                        const formattedArgs: any = {};
-                        const TEXT_FIELDS = ['new_str', 'old_str', 'new_content', 'old_content', 'content', 'insert_text', 'file_text'];
-                        const MAX_TEXT_LENGTH = 80; // Shorter preview for text fields
-                        const MAX_TOTAL_LENGTH = 600; // Max total length for entire arguments display
-                        
-                        for (const [key, value] of Object.entries(args)) {
-                            if (TEXT_FIELDS.includes(key) && typeof value === 'string' && value.length > MAX_TEXT_LENGTH) {
-                                formattedArgs[key] = value.substring(0, MAX_TEXT_LENGTH) + '...';
-                            } else {
-                                formattedArgs[key] = value;
-                            }
-                        }
-                        
-                        // Format as compact JSON string
-                        let argsString = JSON.stringify(formattedArgs);
-                        
-                        // If still too long, truncate the entire string
-                        if (argsString.length > MAX_TOTAL_LENGTH) {
-                            argsString = argsString.substring(0, MAX_TOTAL_LENGTH - 3) + '...';
-                        }
-                        
-                        toolMessage += `\n> \`${argsString}\``;
-                    }
-                    
-                    if (discordMessage) {
-                        await sendAsyncMessage(toolMessage);
-                    }
-                } catch (e) {
-                    console.error('❌ Error formatting tool call for Discord:', e);
-                }
-            }
-        }
-        console.log(`🔍 [DEBUG] Stream complete! Collected text length: ${text2?.length || 0} chars`);
       } catch (streamError: any) {
         console.error('❌ Error processing stream:', streamError);
         const errMsg = streamError instanceof Error ? streamError.message : String(streamError);
-        
+
         // Socket termination errors - return partial text if we got any
         if (/terminated|other side closed|socket.*closed|UND_ERR_SOCKET/i.test(errMsg)) {
           console.log(`🔌 Stream terminated early - returning collected text (${text2.length} chars)`);
-          // Continue execution - return what we have
         } else {
-          // Other errors - still try to return partial text
           console.log(`⚠️ Stream error - attempting to return partial text (${text2.length} chars)`);
-          
-          // 🔧 FIX: If stream error AND no text collected AND nothing sent via tool, inform user!
-          if (text2.length === 0 && !hasSentViaToolCall) {
+
+          // If stream error AND no text collected AND nothing sent, inform user!
+          if (text2.length === 0 && !hasSentContent) {
             console.error(`❌ Stream error with no response collected - informing user`);
-            return "Beep boop. Something went wrong while processing your image 😕 - Letta had an error. Please try again!";
+            throw new Error('Stream failed with no response collected');
           }
         }
       }
 
-      // Build informative response
-      const noteParts: string[] = [];
-      if (compressedCount > 0) {
-        noteParts.push(`🗜️ ${compressedCount} image${compressedCount === 1 ? '' : 's'} compressed`);
-      }
-      if (skippedCount > 0) {
-        noteParts.push(`⚠️ ${skippedCount} image${skippedCount === 1 ? '' : 's'} skipped (too large)`);
-      }
-      const note = noteParts.length ? `_(${noteParts.join(', ')})_\n\n` : '';
-      
-      // 🔥 NEW (Oct 24, 2025): If we already sent via assistant_message or send_message tool, 
-      // return empty string to prevent duplicate in registerAttachmentForwarder
-      if (hasSentViaToolCall) {
-        console.log(`✅ [STREAM END] Message already sent via real-time streaming - suppressing duplicate (${text2.length} chars collected)`);
+      // If we already sent content via streaming, return empty to avoid duplicate
+      if (hasSentContent) {
+        console.log(`✅ [STREAM END] Content already sent via real-time streaming - suppressing duplicate`);
         return "";
       }
-      
-      console.log(`✅ [STREAM END] Returning collected text to Discord (${text2.length} chars)`);
-      return (note + (text2 || '')).trim();
+
+      return text2;
+
     } catch (e: any) {
       const detail = (e?.body?.detail || e?.response?.data || e?.message || '').toString();
       const statusCode = e?.statusCode || e?.response?.status || 0;
-      console.error('[Letta] Base64 upload failed:', e instanceof Error ? e.message : e);
-      
+      console.error('[Grok] Image upload failed:', e instanceof Error ? e.message : e);
+
       // Provide specific error messages based on failure type
       if (/exceeds\s*5\s*MB/i.test(detail) || /payload.*large/i.test(detail)) {
         return "❌ Image(s) still too large even after compression (>5MB).\n💡 Tip: Please use smaller images (<2MB recommended).";
@@ -798,11 +715,11 @@ async function forwardImagesToLetta(
       } else if (/timeout|ETIMEDOUT/i.test(detail)) {
         return "❌ API timeout - processing took too long.\n💡 Please use smaller images or try later.";
       } else if (/network|ECONNREFUSED|ENOTFOUND/i.test(detail)) {
-        return "❌ Letta API unreachable.\n💡 Please try again later or contact admin.";
+        return "❌ Grok API unreachable.\n💡 Please try again later or contact admin.";
       } else if (statusCode === 502 || statusCode === 503 || /bad gateway|service unavailable/i.test(detail)) {
-        return "❌ Letta server having issues (502/503 error).\n💡 Their LLM backend is overloaded - please try again in 1-2 minutes.";
+        return "❌ Grok server having issues (502/503 error).\n💡 Their backend is overloaded - please try again in 1-2 minutes.";
       }
-      
-      throw e;
+
+      return `❌ Error processing image: ${detail}`;
     }
 }

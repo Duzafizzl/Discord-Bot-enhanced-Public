@@ -9,11 +9,12 @@ Copy these to your `.env` file and fill in your values.
 
 ## 🔴 REQUIRED - Core Functionality
 
-### Letta API
+### Grok API (via nate_api_substrate)
 ```bash
-LETTA_API_KEY=your_letta_api_key_here
-LETTA_BASE_URL=https://api.letta.com
-LETTA_AGENT_ID=agent-your-agent-id-here
+GROK_BASE_URL=http://localhost:8091
+GROK_SESSION_ID=discord-bot
+GROK_MODEL=grok-4-1-fast-reasoning
+GROK_API_TIMEOUT_MS=300000
 ```
 
 ### Discord
@@ -28,7 +29,7 @@ DISCORD_CHANNEL_ID=your_main_channel_id
 
 ```bash
 # Message behavior
-LETTA_USE_SENDER_PREFIX=true
+LETTA_USE_SENDER_PREFIX=true  # Keep for compatibility - controls message formatting
 SURFACE_ERRORS=true
 
 # Response triggers
@@ -202,11 +203,12 @@ PORT=3001
 ## 📝 Example `.env` File
 
 ```bash
-# Core
-LETTA_API_KEY=sk_test_abc123xyz
-LETTA_BASE_URL=https://api.letta.com
-LETTA_AGENT_ID=agent-xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-LETTA_USE_SENDER_PREFIX=true
+# Core - Grok API (via nate_api_substrate)
+GROK_BASE_URL=http://localhost:8091
+GROK_SESSION_ID=discord-bot
+GROK_MODEL=grok-4-1-fast-reasoning
+GROK_API_TIMEOUT_MS=300000
+LETTA_USE_SENDER_PREFIX=true  # Message formatting
 SURFACE_ERRORS=true
 
 # Discord
@@ -219,14 +221,13 @@ RESPOND_TO_MENTIONS=true
 RESPOND_TO_BOTS=false
 RESPOND_TO_GENERIC=false
 
+# Timezone
+TIMEZONE=Europe/Berlin
+
 # Optional features (disabled by default)
 ENABLE_AUTONOMOUS=false  # 🔒 Autonomous mode with bot-loop prevention
 ENABLE_TIMER=false       # Heartbeat system
 ENABLE_TTS=false         # Text-to-speech
-
-# 💰 API Retry (Oct 2025) - Trade-off between UX and Credits
-ENABLE_API_RETRY=true    # Auto-retry on 502/503/504 errors
-MAX_API_RETRIES=1        # Max retry attempts (1 = conservative)
 
 PORT=3001
 ```
