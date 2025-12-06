@@ -13,8 +13,10 @@ A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via 
 ### 🧠 **Grok 4.1 API Integration**
 - **Conversational Memory**: Stateful conversations with persistent memory via nate_api_substrate
 - **Context-Aware Responses**: AI remembers past conversations and user preferences
+- **Streaming Responses**: Real-time message streaming with Server-Sent Events (SSE)
 - **Tool Calling**: Extensible tool system for Discord operations, web search, Spotify control, and more
 - **Advanced Reasoning**: Powered by Grok 4.1's fast reasoning capabilities
+- **Multimodal Support**: Image analysis with Ollama-compatible API format
 
 ### 📅 **Autonomous Task Scheduling**
 - **Smart Scheduler**: Create recurring tasks (hourly, daily, weekly, monthly)
@@ -45,9 +47,9 @@ A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via 
 ### 🌐 **Additional Features**
 - **Weather Integration**: OpenWeatherMap API for weather data
 - **GIF Auto-Sender**: Automatic GIF responses with Tenor API
-- **Image Processing**: OCR, PDF parsing, image analysis
+- **Image Processing**: OCR, PDF parsing, image analysis with automatic compression
 - **YouTube Transcripts**: Fetch and analyze YouTube video content
-- **Attachment Forwarding**: Smart file handling with size management
+- **Attachment Forwarding**: Smart file handling with size management and real-time streaming
 
 ---
 

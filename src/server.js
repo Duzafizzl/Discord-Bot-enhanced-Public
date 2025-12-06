@@ -7,6 +7,7 @@ require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const discord_js_1 = require("discord.js");
 const messages_1 = require("./messages");
+const attachmentForwarder_1 = require("./attachmentForwarder");
 const grokClient_1 = require("./grokClient");
 const taskScheduler_1 = require("./taskScheduler");
 const youtubeTranscript_1 = require("./youtubeTranscript");
@@ -198,8 +199,8 @@ client.on('error', (error) => {
 client.on('warn', (info) => {
     console.log(`⚠️  [Discord.js Warning] ${info}`);
 });
-// Register attachment forwarder - DISABLED: TODO update for Grok API
-// registerAttachmentForwarder(client);
+// Register attachment forwarder - processes image attachments with Grok API
+(0, attachmentForwarder_1.registerAttachmentForwarder)(client);
 // Discord Bot Ready Event
 client.once('ready', async () => {
     console.log(`🤖 Logged in as ${client.user?.tag}!`);

@@ -231,8 +231,8 @@ client.on('warn', (info: string) => {
   console.log(`⚠️  [Discord.js Warning] ${info}`);
 });
 
-// Register attachment forwarder - DISABLED: TODO update for Grok API
-// registerAttachmentForwarder(client);
+// Register attachment forwarder - processes image attachments with Grok API
+registerAttachmentForwarder(client);
 
 // Discord Bot Ready Event
 client.once('ready', async () => {

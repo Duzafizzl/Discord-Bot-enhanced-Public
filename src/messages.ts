@@ -183,21 +183,51 @@ async function sendMessage(
   }, 8000);
 
   try {
-    console.log(`🛜 Sending message to Grok API (session=${GROK_SESSION_ID}): ${JSON.stringify(grokMessage)}`);
+    console.log(`🛜 Sending message to Grok API with streaming (session=${GROK_SESSION_ID}): ${JSON.stringify(grokMessage)}`);
 
-    // Send request to Grok API
+    // Send request to Grok API with streaming
     const request: GrokChatRequest = {
       messages: [grokMessage],
       session_id: GROK_SESSION_ID,
       message_type: messageType === MessageType.DM ? 'inbox' : 'inbox',
     };
 
-    const response = await grokClient.chat(request);
+    let agentMessageResponse = '';
+    let thinkingContent = '';
+    const toolCalls: Array<{ name: string; arguments: any }> = [];
+    let tokens: { prompt: number; completion: number; total: number } | null = null;
+
+    // Process streaming response
+    for await (const chunk of grokClient.chatStream(request)) {
+      console.log(`📦 [STREAM CHUNK] Event: ${chunk.event}`);
+
+      if (chunk.event === 'thinking' && chunk.data) {
+        const content = typeof chunk.data === 'string' ? chunk.data : chunk.data.content || '';
+        console.log(`💭 [THINKING] ${content.substring(0, 100)}...`);
+        thinkingContent += content;
+      } else if (chunk.event === 'content' && chunk.data) {
+        const content = typeof chunk.data === 'string' ? chunk.data : chunk.data.content || '';
+        console.log(`💬 [CONTENT] ${content.substring(0, 100)}...`);
+        agentMessageResponse += content;
+      } else if (chunk.event === 'tool_call' && chunk.data) {
+        const toolName = chunk.data.name || 'unknown';
+        const toolArgs = chunk.data.arguments || {};
+        console.log(`🔧 [TOOL CALL] ${toolName}(${JSON.stringify(toolArgs).substring(0, 100)}...)`);
+        toolCalls.push({
+          name: toolName,
+          arguments: toolArgs
+        });
+      } else if (chunk.event === 'done') {
+        console.log(`✅ [STREAM DONE] Total content: ${agentMessageResponse.length} chars`);
+        if (chunk.data && chunk.data.tokens) {
+          tokens = chunk.data.tokens;
+          const t = chunk.data.tokens;
+          console.log(`📊 Tokens: ${t.prompt} prompt + ${t.completion} completion = ${t.total} total`);
+        }
+      }
+    }
 
     clearInterval(typingInterval);
-
-    // Extract response content
-    const agentMessageResponse = response.message?.content || '';
 
     if (!agentMessageResponse || !agentMessageResponse.trim()) {
       console.warn('⚠️ Received empty response from Grok API');
@@ -231,21 +261,16 @@ async function sendMessage(
     );
 
     // Log thinking/reasoning if available
-    if (response.thinking) {
-      console.log(`💭 Thinking: ${response.thinking.substring(0, 100)}...`);
+    if (thinkingContent) {
+      console.log(`💭 Thinking: ${thinkingContent.substring(0, 100)}...`);
     }
 
-    // Log tool calls if available
-    if (response.tool_calls && response.tool_calls.length > 0) {
-      console.log(`🔧 Tool calls: ${response.tool_calls.length}`);
-      response.tool_calls.forEach((tool, idx) => {
+    // Log tool calls summary if available
+    if (toolCalls.length > 0) {
+      console.log(`🔧 Tool calls summary: ${toolCalls.length} total`);
+      toolCalls.forEach((tool, idx) => {
         console.log(`  ${idx + 1}. ${tool.name}(${JSON.stringify(tool.arguments).substring(0, 100)}...)`);
       });
-    }
-
-    // Log token usage if available
-    if (response.tokens) {
-      console.log(`📊 Tokens: ${response.tokens.prompt} prompt + ${response.tokens.completion} completion = ${response.tokens.total} total`);
     }
 
     return agentMessageResponse;
