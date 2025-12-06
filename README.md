@@ -16,7 +16,7 @@ A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via 
 - **Streaming Responses**: Real-time message streaming with Server-Sent Events (SSE)
 - **Tool Calling**: Extensible tool system for Discord operations, web search, Spotify control, and more
 - **Advanced Reasoning**: Powered by Grok 4.1's fast reasoning capabilities
-- **Multimodal Support**: Image analysis with Ollama-compatible API format
+- **Multimodal Support**: Image analysis with base64 encoding via nate_api_substrate
 
 ### 📅 **Autonomous Task Scheduling**
 - **Smart Scheduler**: Create recurring tasks (hourly, daily, weekly, monthly)
