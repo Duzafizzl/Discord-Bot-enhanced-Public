@@ -5,6 +5,7 @@
 # Environment variables (HIGHEST PRIORITY!)
 .env
 .env.*
+!.env.example
 *.env
 .env.local
 .env.production
