@@ -6,15 +6,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=your_username
-Group=your_username
-WorkingDirectory=/path/to/wolfe-discord-bot-enhanced
+User=root
+Group=root
+WorkingDirectory=/opt/aicara/wolfe-discord-bot-enhanced
 
 # Environment file (contains all secrets)
-EnvironmentFile=/path/to/wolfe-discord-bot-enhanced/.env
+EnvironmentFile=/opt/aicara/wolfe-discord-bot-enhanced/.env
 
-# Start command - use npm start
-ExecStart=/usr/bin/npm start
+# Start command - use full path to npm
+ExecStart=/opt/node22/bin/npm start
 
 # Restart policy
 Restart=always
@@ -27,12 +27,12 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Security hardening
+# Security hardening (relaxed for compatibility)
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/path/to/wolfe-discord-bot-enhanced/logs
+# ProtectSystem=strict  # Disabled - can cause NAMESPACE errors
+# ProtectHome=read-only  # Disabled - can cause NAMESPACE errors
+# ReadWritePaths=/opt/aicara/wolfe-discord-bot-enhanced/logs  # Disabled - logs will use journal
 
 # Logging
 StandardOutput=journal
