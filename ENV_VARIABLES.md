@@ -29,7 +29,7 @@ DISCORD_CHANNEL_ID=your_main_channel_id
 
 ```bash
 # Message behavior
-LETTA_USE_SENDER_PREFIX=true  # Keep for compatibility - controls message formatting
+USE_SENDER_PREFIX=true  # Controls message formatting - includes sender name in context
 SURFACE_ERRORS=true
 
 # Response triggers
@@ -208,7 +208,7 @@ GROK_BASE_URL=http://localhost:8091
 GROK_SESSION_ID=discord-bot
 GROK_MODEL=grok-4-1-fast-reasoning
 GROK_API_TIMEOUT_MS=300000
-LETTA_USE_SENDER_PREFIX=true  # Message formatting
+USE_SENDER_PREFIX=true  # Message formatting
 SURFACE_ERRORS=true
 
 # Discord

@@ -124,7 +124,7 @@ DISCORD_TOKEN=your_discord_bot_token_here
 DISCORD_CHANNEL_ID=your_main_channel_id
 
 # Bot Behavior
-LETTA_USE_SENDER_PREFIX=true  # Message formatting
+USE_SENDER_PREFIX=true  # Message formatting
 SURFACE_ERRORS=true
 RESPOND_TO_DMS=true
 RESPOND_TO_MENTIONS=true
