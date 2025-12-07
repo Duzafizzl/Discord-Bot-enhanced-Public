@@ -18,7 +18,7 @@ var MessageType;
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'http://localhost:8091';
 const GROK_SESSION_ID = process.env.GROK_SESSION_ID || 'discord-bot';
 const GROK_MODEL = process.env.GROK_MODEL || 'grok-4-1-fast-reasoning';
-const USE_SENDER_PREFIX = process.env.LETTA_USE_SENDER_PREFIX === 'true'; // Keep for compatibility
+const USE_SENDER_PREFIX = process.env.USE_SENDER_PREFIX === 'true';
 const SURFACE_ERRORS = process.env.SURFACE_ERRORS === 'true';
 const GROK_API_TIMEOUT_MS = parseInt(process.env.GROK_API_TIMEOUT_MS || '300000', 10);
 // Initialize Grok Client
