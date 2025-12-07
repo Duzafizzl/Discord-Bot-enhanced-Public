@@ -10,7 +10,8 @@ const messages_1 = require("./messages");
 const attachmentForwarder_1 = require("./attachmentForwarder");
 const grokClient_1 = require("./grokClient");
 const taskScheduler_1 = require("./taskScheduler");
-const youtubeTranscript_1 = require("./youtubeTranscript");
+// YouTube transcript temporarily disabled due to ES module compatibility issue
+// import { preprocessYouTubeLinks, handleChunkRequest } from './youtubeTranscript';
 const fileChunking_1 = require("./fileChunking");
 const lettaStatsMonitor_1 = require("./lettaStatsMonitor");
 const dailyStatsSummary_1 = require("./dailyStatsSummary");
@@ -230,7 +231,7 @@ async function processAndSendMessage(message, messageType, conversationContext =
                 const wasFarewell = msg.toLowerCase().includes('gotta go') ||
                     msg.toLowerCase().includes('catch you later') ||
                     msg.toLowerCase().includes('step away');
-                (0, autonomous_1.recordBotReply)(message.channel.id, client.user.id, wasFarewell);
+                (0, autonomous_1.recordBotReply)(message.channel.id, client.user?.id || 'unknown', wasFarewell);
             }
             if (msg.length <= 1900) {
                 await message.reply(msg);
@@ -416,7 +417,7 @@ client.on('messageCreate', async (message) => {
                 const wasFarewell = msg.toLowerCase().includes('gotta go') ||
                     msg.toLowerCase().includes('catch you later') ||
                     msg.toLowerCase().includes('step away');
-                (0, autonomous_1.recordBotReply)(message.channel.id, client.user.id, wasFarewell);
+                (0, autonomous_1.recordBotReply)(message.channel.id, client.user?.id || 'unknown', wasFarewell);
             }
             if (msg.length <= 1900) {
                 await message.reply(msg);
@@ -434,14 +435,15 @@ client.on('messageCreate', async (message) => {
         }
         return;
     }
-    // 🎥 YOUTUBE CHUNK/INFO REQUEST HANDLER (Oct 26, 2025)
+    // 🎥 YOUTUBE CHUNK/INFO REQUEST HANDLER (Oct 26, 2025) - TEMPORARILY DISABLED
     // Check for chunk/info requests BEFORE processing YouTube links
-    console.log(`🎥 Checking for YouTube chunk/info requests in: "${message.content.substring(0, 200)}"`);
-    const chunkResponse = (0, youtubeTranscript_1.handleChunkRequest)(message.content);
-    if (chunkResponse) {
+    console.log(`🎥 YouTube chunk/info requests temporarily disabled`);
+    // const chunkResponse = handleChunkRequest(message.content);
+    const chunkResponse = null; // YouTube transcript disabled
+    if (false) { // chunkResponse disabled
         console.log('✅ YouTube chunk/info request detected - processing');
         console.log(`📖 Request content: ${message.content.substring(0, 100)}...`);
-        console.log(`📖 Chunk response length: ${chunkResponse.length} characters`);
+        console.log(`📖 Chunk response length: 0 characters`);
         console.log('📖 Sending chunk/info response to Letta');
         // Determine message type
         let messageType = messages_1.MessageType.GENERIC;
@@ -458,7 +460,7 @@ client.on('messageCreate', async (message) => {
                 const wasFarewell = msg.toLowerCase().includes('gotta go') ||
                     msg.toLowerCase().includes('catch you later') ||
                     msg.toLowerCase().includes('step away');
-                (0, autonomous_1.recordBotReply)(message.channel.id, client.user.id, wasFarewell);
+                (0, autonomous_1.recordBotReply)(message.channel.id, client.user?.id || 'unknown', wasFarewell);
             }
             if (msg.length <= 1900) {
                 await message.reply(msg);
@@ -492,7 +494,12 @@ client.on('messageCreate', async (message) => {
     else {
         console.log('🎥 No YouTube links found - skipping transcript processing');
     }
-    const youtubeResult = await (0, youtubeTranscript_1.preprocessYouTubeLinks)(message.content, async () => await message.channel.sendTyping());
+    // YouTube transcript disabled due to ES module compatibility
+    // const youtubeResult = await preprocessYouTubeLinks(
+    //   message.content,
+    //   async () => await message.channel.sendTyping()
+    // );
+    const youtubeResult = { processedMessage: message.content, videosProcessed: 0, videosFailed: 0 };
     // Delete status message and send completion info
     if (statusMessage) {
         await statusMessage.delete().catch(() => console.log('⚠️ Could not delete status message'));
@@ -511,7 +518,7 @@ client.on('messageCreate', async (message) => {
         }
     }
     // Store processed content for use in message handlers
-    const processedContent = youtubeResult.content !== message.content ? youtubeResult.content : null;
+    const processedContent = youtubeResult.processedMessage !== message.content ? youtubeResult.processedMessage : null;
     // Handle DMs
     if (message.guild === null) {
         console.log(`📩 Received DM from ${message.author.username} (${message.author.id}): ${message.content}`);
@@ -558,7 +565,7 @@ client.on('messageCreate', async (message) => {
                 const wasFarewell = msg.toLowerCase().includes('gotta go') ||
                     msg.toLowerCase().includes('catch you later') ||
                     msg.toLowerCase().includes('step away');
-                (0, autonomous_1.recordBotReply)(message.channel.id, client.user.id, wasFarewell);
+                (0, autonomous_1.recordBotReply)(message.channel.id, client.user?.id || 'unknown', wasFarewell);
             }
             await message.reply(msg);
         }
