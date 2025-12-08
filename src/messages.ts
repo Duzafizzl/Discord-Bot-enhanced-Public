@@ -325,8 +325,16 @@ async function sendTimerMessage(channel: any): Promise<string> {
 
     const response = await grokClient.chat(request);
     const sendMessage = response.send_message !== false; // Default true for backward compatibility
-    const content = response.message?.content || '';
+    let content = response.message?.content || '';
     const toolCalls = response.tool_calls || [];
+
+    // TEMPORARY WORKAROUND: Strip <decision> block if substrate didn't remove it
+    // This should be fixed in substrate, but adding safety check here
+    const decisionBlockRegex = /<decision>[\s\S]*?<\/decision>/gi;
+    if (decisionBlockRegex.test(content)) {
+      console.warn('⚠️ Decision block found in message content - stripping it out (substrate should handle this)');
+      content = content.replace(decisionBlockRegex, '').trim();
+    }
 
     // Log tool usage for visibility
     if (toolCalls.length > 0) {
