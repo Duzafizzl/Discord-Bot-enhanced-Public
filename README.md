@@ -1,6 +1,6 @@
-# 🤖 Discord-Grok Bot
+# 🤖 Discord AI Bot (Grok & Ollama Cloud)
 
-A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via [nate_api_substrate](https://github.com/clotho2/nate_api_substrate), featuring memory management, scheduled tasks, voice messages, Spotify integration, and more.
+A powerful, autonomous Discord bot powered by [xAI Grok](https://x.ai/) or [Ollama Cloud](https://ollama.com/) via [nate_api_substrate](https://github.com/clotho2/nate_api_substrate), featuring memory management, scheduled tasks, voice messages, Spotify integration, and more.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
@@ -10,12 +10,15 @@ A powerful, autonomous Discord bot powered by [Grok 4.1 API](https://x.ai/) via 
 
 ## ✨ Features
 
-### 🧠 **Grok 4.1 API Integration**
+### 🧠 **LLM Integration (Grok 4.1 & Ollama Cloud)**
+- **Multiple Model Support**: Choose between xAI Grok or Ollama Cloud models
+  - **Grok**: grok-4-1-fast-reasoning, grok-4-1-thinking
+  - **Ollama Cloud**: kimi-k2-thinking:cloud (128K context), deepseek-r1-distill-qwen:cloud, and more
 - **Conversational Memory**: Stateful conversations with persistent memory via nate_api_substrate
 - **Context-Aware Responses**: AI remembers past conversations and user preferences
 - **Streaming Responses**: Real-time message streaming with Server-Sent Events (SSE)
 - **Tool Calling**: Extensible tool system for Discord operations, web search, Spotify control, and more
-- **Advanced Reasoning**: Powered by Grok 4.1's fast reasoning capabilities
+- **Advanced Reasoning**: Support for reasoning models (Grok 4.1, Kimi K2, DeepSeek R1)
 - **Multimodal Support**: Image analysis with base64 encoding via nate_api_substrate
 
 ### 📅 **Autonomous Task Scheduling**
