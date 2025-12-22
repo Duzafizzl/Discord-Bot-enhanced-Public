@@ -584,3 +584,59 @@ export async function forceFlush(): Promise<void> {
   console.log('📝 [Conversation Logger] Force flushed');
 }
 
+/**
+ * Get the last N conversation turns from the logs
+ * Returns an array of conversation turns (user message + bot response pairs)
+ */
+export async function getRecentConversationTurns(limit: number = 3): Promise<Array<{ user: string; assistant: string; timestamp: string }>> {
+  try {
+    // Ensure we flush any pending writes first
+    await flushBuffer();
+
+    // Get today's log file
+    const logFilePath = getLogFilePath();
+
+    // Check if log file exists
+    if (!fs.existsSync(logFilePath)) {
+      console.log('📝 [Conversation Logger] No log file found for today');
+      return [];
+    }
+
+    // Read the entire log file
+    const fileContent = await fs.promises.readFile(logFilePath, 'utf8');
+    const lines = fileContent.trim().split('\n').filter(line => line.trim());
+
+    // Parse all entries
+    const entries: ConversationLogEntry[] = [];
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        entries.push(entry);
+      } catch (err) {
+        // Skip malformed lines
+        console.warn('⚠️ [Conversation Logger] Failed to parse log line:', line.substring(0, 100));
+      }
+    }
+
+    // Filter to only conversation_turn entries (these have both input and output)
+    const conversationTurns = entries.filter(e => e.type === 'conversation_turn');
+
+    // Get the last N conversation turns
+    const recentTurns = conversationTurns.slice(-limit);
+
+    // Format them for heartbeat context
+    const formattedTurns = recentTurns.map(turn => ({
+      user: turn.metadata?.full_input || turn.content,
+      assistant: turn.metadata?.full_output || '',
+      timestamp: turn.timestamp
+    }));
+
+    console.log(`📝 [Conversation Logger] Retrieved ${formattedTurns.length} recent conversation turn(s)`);
+    return formattedTurns;
+
+  } catch (error) {
+    console.error('❌ [Conversation Logger] Failed to get recent conversation turns:', error);
+    return [];
+  }
+}
+
