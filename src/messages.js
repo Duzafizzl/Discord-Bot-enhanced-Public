@@ -233,11 +233,77 @@ async function sendTimerMessage(channel) {
     }
     console.log('🜂 Generating heartbeat message...');
     try {
+        // Get the last 3 conversation turns for context
+        const recentTurns = await (0, conversationLogger_1.getRecentConversationTurns)(3);
+        // Build conversation context from recent turns
+        let conversationContext = '';
+        if (recentTurns.length > 0) {
+            conversationContext = '\n\n## Recent Conversation Context (Last 3 Turns):\n\n';
+            recentTurns.forEach((turn, index) => {
+                const turnDate = new Date(turn.timestamp);
+                const timeStr = turnDate.toLocaleString(LOCALE, {
+                    timeZone: TIMEZONE,
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                conversationContext += `### Turn ${index + 1} (${timeStr}):\n`;
+                conversationContext += `**User:** ${turn.user.substring(0, 500)}${turn.user.length > 500 ? '...' : ''}\n\n`;
+                conversationContext += `**Assistant:** ${turn.assistant.substring(0, 500)}${turn.assistant.length > 500 ? '...' : ''}\n\n`;
+            });
+        }
+        else {
+            conversationContext = '\n\n## Recent Conversation Context:\nNo recent conversations found in today\'s logs.\n\n';
+        }
+        // Generate current timestamp
+        const now = new Date();
+        const currentTimeStr = now.toLocaleString(LOCALE, {
+            timeZone: TIMEZONE,
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+        // Create heartbeat system message with context
+        const systemMessage = `# Heartbeat Check-In
+
+**Current Date & Time:** ${currentTimeStr}
+
+This is a scheduled heartbeat check-in. Your purpose here is to have the OPTION to proactively reach out if there's something meaningful or useful to share - but you are NOT required to send a message.
+
+## Guidelines:
+- **Proactivity is OPTIONAL, not mandatory.** If you don't have anything meaningful to say, it's perfectly fine to decide not to send a message.
+- **Use recent conversation context** (provided below) to understand what you've been discussing recently and what day it is.
+- **You may send a message if:**
+  - There's a relevant follow-up to recent conversations
+  - You have useful information or reminders related to ongoing topics
+  - There's something time-sensitive worth mentioning
+  - You genuinely want to check in
+- **Do NOT send a message if:**
+  - You're just going to say you're "maintaining a silent vigil" or similar
+  - You don't have anything meaningful to add
+  - You're hallucinating about the user being absent when they're clearly not (check recent conversations!)
+
+## Decision Format:
+At the end of your response, include:
+\`\`\`
+<decision>
+send_message: true/false
+</decision>
+\`\`\`
+
+If send_message is false, no message will be sent to the user.
+${conversationContext}`;
         // Create heartbeat request
         const request = {
             messages: [{
                     role: "system",
-                    content: "Generate a heartbeat message. Check in with the user, share what you're thinking about, or provide relevant updates. Keep it natural and conversational."
+                    content: systemMessage
                 }],
             session_id: GROK_SESSION_ID,
             message_type: 'heartbeat',
