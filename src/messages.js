@@ -18,6 +18,7 @@ var MessageType;
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'http://localhost:8091';
 const GROK_SESSION_ID = process.env.GROK_SESSION_ID || 'discord-bot';
 const GROK_MODEL = process.env.GROK_MODEL || 'grok-4-1-fast-reasoning';
+const GROK_MAX_TOKENS = parseInt(process.env.GROK_MAX_TOKENS || '8192', 10); // Allow longer responses
 const USE_SENDER_PREFIX = process.env.USE_SENDER_PREFIX === 'true';
 const SURFACE_ERRORS = process.env.SURFACE_ERRORS === 'true';
 const GROK_API_TIMEOUT_MS = parseInt(process.env.GROK_API_TIMEOUT_MS || '300000', 10);
@@ -29,6 +30,7 @@ const grokClient = new grokClient_1.GrokClient({
     sessionId: GROK_SESSION_ID,
     model: GROK_MODEL,
     timeout: GROK_API_TIMEOUT_MS,
+    maxTokens: GROK_MAX_TOKENS, // Pass max tokens to client
 });
 /**
  * Send a user message to Grok and get a response
@@ -145,7 +147,9 @@ async function sendMessage(discordMessageObject, messageType, conversationContex
             messages: [grokMessage],
             session_id: GROK_SESSION_ID,
             message_type: messageType === MessageType.DM ? 'inbox' : 'inbox',
+            max_tokens: GROK_MAX_TOKENS, // Explicitly set max tokens
         };
+        console.log(`📊 Request config: max_tokens=${request.max_tokens}, model=${GROK_MODEL}, session=${GROK_SESSION_ID}`);
         let agentMessageResponse = '';
         let thinkingContent = '';
         const toolCalls = [];
@@ -225,13 +229,14 @@ async function sendMessage(discordMessageObject, messageType, conversationContex
 }
 /**
  * Send a timer/heartbeat message to Grok
+ * Returns the message to send to Discord, or empty string if no message should be sent
  */
 async function sendTimerMessage(channel) {
     if (!channel) {
         console.log('⏰ No channel provided for timer message');
         return "";
     }
-    console.log('🜂 Generating heartbeat message...');
+    console.log('🜂 Generating heartbeat...');
     try {
         // Get the last 3 conversation turns for context
         const recentTurns = await (0, conversationLogger_1.getRecentConversationTurns)(3);
@@ -319,18 +324,43 @@ ${conversationContext}`;
                     content: systemMessage
                 }],
             session_id: GROK_SESSION_ID,
-            message_type: 'heartbeat',
+            message_type: 'system', // 'system' triggers autonomous mode in substrate
+            max_tokens: GROK_MAX_TOKENS, // Explicitly set max tokens
         };
+        console.log(`🜂 Heartbeat config: max_tokens=${request.max_tokens}`);
         const response = await grokClient.chat(request);
-        const heartbeatMessage = response.message?.content || '';
-        if (heartbeatMessage && heartbeatMessage.trim()) {
-            // Log heartbeat
-            (0, conversationLogger_1.logHeartbeat)(heartbeatMessage, channel.id, channel.name || 'unknown');
-            console.log(`🜂 Heartbeat generated: ${heartbeatMessage.substring(0, 100)}...`);
-            return heartbeatMessage;
+        const sendMessage = response.send_message !== false; // Default true for backward compatibility
+        let content = response.message?.content || '';
+        const toolCalls = response.tool_calls || [];
+        // TEMPORARY WORKAROUND: Strip <decision> block if substrate didn't remove it
+        // This should be fixed in substrate, but adding safety check here
+        const decisionBlockRegex = /<decision>[\s\S]*?<\/decision>/gi;
+        if (decisionBlockRegex.test(content)) {
+            console.warn('⚠️ Decision block found in message content - stripping it out (substrate should handle this)');
+            content = content.replace(decisionBlockRegex, '').trim();
         }
-        console.warn('⚠️ Empty heartbeat response');
-        return "";
+        // Log tool usage for visibility
+        if (toolCalls.length > 0) {
+            console.log(`🔧 [HEARTBEAT] Used ${toolCalls.length} tool(s): ${toolCalls.map(t => t.name).join(', ')}`);
+        }
+        // Check if Nate wants to send a message to Discord
+        if (sendMessage && content && content.trim()) {
+            (0, conversationLogger_1.logHeartbeat)(content, channel.id, channel.name || 'unknown');
+            console.log(`💬 [HEARTBEAT → USER] ${content.substring(0, 100)}...`);
+            return content;
+        }
+        else if (!sendMessage) {
+            console.log(`🔕 [HEARTBEAT → BACKGROUND] Autonomous actions completed, no message to user`);
+            // Log the background activity for debugging
+            if (content && content.trim()) {
+                (0, conversationLogger_1.logHeartbeat)(`[BACKGROUND] ${content}`, channel.id, channel.name || 'unknown');
+            }
+            return "";
+        }
+        else {
+            console.log(`💤 [HEARTBEAT → NONE] No action taken`);
+            return "";
+        }
     }
     catch (error) {
         console.error("❌ Error generating heartbeat:", error);
@@ -353,6 +383,7 @@ async function sendTaskMessage(taskName, taskPrompt) {
                 }],
             session_id: GROK_SESSION_ID,
             message_type: 'task',
+            max_tokens: GROK_MAX_TOKENS, // Explicitly set max tokens
         };
         const response = await grokClient.chat(request);
         const taskResponse = response.message?.content || '';

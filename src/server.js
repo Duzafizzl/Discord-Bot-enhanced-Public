@@ -307,12 +307,27 @@ async function startRandomEventTimer() {
             const msg = await (0, messages_1.sendTimerMessage)(channel);
             if (msg !== "" && channel) {
                 try {
-                    await channel.send(msg);
-                    console.log("🜂 Heartbeat message sent to channel");
+                    // 📦 CHUNKING: Split long messages to avoid Discord's 2000 char limit
+                    if (msg.length <= 1900) {
+                        await channel.send(msg);
+                        console.log("🜂 Heartbeat message sent to channel");
+                    }
+                    else {
+                        const chunks = chunkText(msg, 1900);
+                        await channel.send(chunks[0]);
+                        for (let i = 1; i < chunks.length; i++) {
+                            await new Promise(r => setTimeout(r, 200));
+                            await channel.send(chunks[i]);
+                        }
+                        console.log(`🜂 Heartbeat message sent in ${chunks.length} chunks (total: ${msg.length} chars)`);
+                    }
                 }
                 catch (error) {
                     console.error("🜂 Error sending heartbeat message:", error);
                 }
+            }
+            else if (msg === "" && channel) {
+                console.log("🜂 Heartbeat completed - autonomous actions taken, no message to Discord");
             }
             else if (!channel) {
                 console.log("🜂 No CHANNEL_ID defined or channel not available; message not sent.");
@@ -328,6 +343,9 @@ async function startRandomEventTimer() {
 }
 // Handle messages
 client.on('messageCreate', async (message) => {
+    // 🔍 DEBUG: Log all incoming messages to diagnose channel filtering
+    console.log(`📨 [DEBUG] Message received: author=${message.author.username}, channel=${message.channel.id}, guild=${message.guild?.id || 'DM'}, content="${message.content.substring(0, 50)}..."`);
+    console.log(`📨 [DEBUG] Config: CHANNEL_ID="${CHANNEL_ID || 'UNSET'}", RESPOND_TO_MENTIONS=${RESPOND_TO_MENTIONS}, ENABLE_AUTONOMOUS=${ENABLE_AUTONOMOUS}`);
     // 🔒 AUTONOMOUS: Track ALL messages for context (EXCEPT our own bot messages to save credits!)
     if (ENABLE_AUTONOMOUS && client.user?.id && message.author.id !== client.user.id) {
         (0, autonomous_1.trackMessage)(message, client.user.id);
@@ -349,9 +367,10 @@ client.on('messageCreate', async (message) => {
     }
     // Filter channels if CHANNEL_ID is set, but ALWAYS allow DMs through
     if (CHANNEL_ID && message.guild && message.channel.id !== CHANNEL_ID) {
-        console.log(`📩 Ignoring message from other channels (only listening on channel=${CHANNEL_ID})...`);
+        console.log(`📩 [CHANNEL FILTER] Ignoring message from channel ${message.channel.id} (only listening on channel=${CHANNEL_ID})`);
         return;
     }
+    console.log(`✅ [CHANNEL FILTER] Passed channel filter check`);
     if (message.author.id === client.user?.id) {
         console.log(`📩 Ignoring message from myself (NOT sending to Letta - saves credits!)...`);
         return;
@@ -567,7 +586,20 @@ client.on('messageCreate', async (message) => {
                     msg.toLowerCase().includes('step away');
                 (0, autonomous_1.recordBotReply)(message.channel.id, client.user?.id || 'unknown', wasFarewell);
             }
-            await message.reply(msg);
+            // 📦 CHUNKING: Split long messages to avoid Discord's 2000 char limit
+            if (msg.length <= 1900) {
+                await message.reply(msg);
+                console.log(`📨 Message sent: ${msg.substring(0, 100)}...`);
+            }
+            else {
+                const chunks = chunkText(msg, 1900);
+                await message.reply(chunks[0]);
+                for (let i = 1; i < chunks.length; i++) {
+                    await new Promise(r => setTimeout(r, 200));
+                    await message.channel.send(chunks[i]);
+                }
+                console.log(`📦 Message sent in ${chunks.length} chunks (total: ${msg.length} chars)`);
+            }
         }
         return;
     }
