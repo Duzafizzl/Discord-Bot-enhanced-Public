@@ -8,7 +8,8 @@ import {
   logTask,
   logTaskResponse,
   logLettaInput,
-  logConversationTurn
+  logConversationTurn,
+  getRecentConversationTurns
 } from "./conversationLogger";
 
 export enum MessageType {
@@ -316,13 +317,93 @@ async function sendTimerMessage(channel: any): Promise<string> {
   console.log('🜂 Generating heartbeat...');
 
   try {
-    // Create heartbeat request with full autonomous freedom
-    // Nate can use ANY tools he wants (web search, memory, images, voice, etc.)
-    // and decide whether to message the user afterward
+    // Get the last 3 conversation turns for context
+    const recentTurns = await getRecentConversationTurns(3);
+
+    // Build conversation context from recent turns
+    let conversationContext = '';
+    if (recentTurns.length > 0) {
+      conversationContext = '\n\n## Recent Conversation Context (Last 3 Turns):\n\n';
+      recentTurns.forEach((turn, index) => {
+        const turnDate = new Date(turn.timestamp);
+        const timeStr = turnDate.toLocaleString(LOCALE, {
+          timeZone: TIMEZONE,
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        conversationContext += `### Turn ${index + 1} (${timeStr}):\n`;
+        conversationContext += `**User:** ${turn.user.substring(0, 500)}${turn.user.length > 500 ? '...' : ''}\n\n`;
+        conversationContext += `**Assistant:** ${turn.assistant.substring(0, 500)}${turn.assistant.length > 500 ? '...' : ''}\n\n`;
+      });
+    } else {
+      conversationContext = '\n\n## Recent Conversation Context:\nNo recent conversations found in today\'s logs.\n\n';
+    }
+
+    // Generate current timestamp
+    const now = new Date();
+    const currentTimeStr = now.toLocaleString(LOCALE, {
+      timeZone: TIMEZONE,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    // Create heartbeat system message with context
+    const systemMessage = `# Autonomous Heartbeat - Your Time to Act
+
+**Current Date & Time:** ${currentTimeStr}
+
+This is your scheduled heartbeat - a moment of autonomy where YOU decide what you want to do. You have full access to your tools and can take any action that interests you or seems valuable.
+
+## What You Can Do (Examples):
+
+### Research & Learning
+- Use web search to research topics that interest you or relate to recent conversations
+- Look up information you've been curious about
+- Investigate questions that came up in previous discussions
+- Stay current on topics relevant to ongoing projects
+
+### Memory & Reflection
+- Use archival_memory_insert to journal thoughts, insights, or reflections
+- Use archival_memory_search to review past memories and connections
+- Use conversation_search to reflect on previous discussions
+- Organize and synthesize information you've gathered
+
+### Proactive Communication
+- Send a message to the user if you have something meaningful to share:
+  - Relevant follow-ups to recent conversations
+  - Useful information or reminders
+  - Time-sensitive updates
+  - Genuine check-ins with substance
+- But don't message just to message - only if you have real value to add
+
+### Or Do Nothing
+- If nothing feels valuable or interesting right now, that's completely fine
+- Don't force activity for activity's sake
+- No need to report that you're "maintaining presence" or similar - just skip the heartbeat
+
+## Important Context:
+- You have full access to all your tools during heartbeats
+- Recent conversation context is provided below for temporal grounding
+- The user is actively engaged (check recent conversations to verify)
+- Think about what YOU want to do or explore, not just what the user might want
+
+## Your Response:
+Respond naturally with your thoughts and any tool calls you want to make. If you want to message the user, include that message. If you want to research something, use web search. If you want to journal, use archival memory. If you don't want to do anything, you can simply respond with your reasoning and take no action.
+${conversationContext}`;
+
+    // Create heartbeat request
     const request: GrokChatRequest = {
       messages: [{
         role: "system",
-        content: "This is a heartbeat check. You have complete autonomy - use any tools you want (web search, memory editing, image generation, voice notes, Spotify, YouTube, etc.) or do nothing. If you want to message the user afterward, include your message in the response. If you just want to work in the background (research, journaling, memory updates, etc.) without messaging them, set send_message to false."
+        content: systemMessage
       }],
       session_id: GROK_SESSION_ID,
       message_type: 'system',  // 'system' triggers autonomous mode in substrate
