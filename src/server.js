@@ -23,6 +23,8 @@ const adminCommands_1 = require("./adminCommands");
 // TTS imports removed - using ElevenLabs integration instead
 // 📝 CONVERSATION LOGGER (for training data)
 const conversationLogger_1 = require("./conversationLogger");
+// 🎤 VOICE TRANSCRIPTION (Whisper API)
+const voiceTranscription_1 = require("./voiceTranscription");
 // 🤖 MCP HANDLER - Rider Pi Robot Control (Dec 2025)
 const mcpHandler_1 = require("./mcpHandler");
 // ============================================
@@ -101,6 +103,22 @@ const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const HEARTBEAT_LOG_CHANNEL_ID = process.env.HEARTBEAT_LOG_CHANNEL_ID;
 const MESSAGE_REPLY_TRUNCATE_LENGTH = 100;
 const ENABLE_TIMER = process.env.ENABLE_TIMER === 'true';
+// 🎤 Voice Transcription Configuration
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+let voiceTranscriptionService = null;
+// Initialize voice transcription if API key is provided
+if (OPENAI_API_KEY) {
+    try {
+        voiceTranscriptionService = new voiceTranscription_1.VoiceTranscriptionService(OPENAI_API_KEY);
+        console.log('🎤 Voice transcription enabled (OpenAI Whisper)');
+    }
+    catch (error) {
+        console.error('❌ Failed to initialize voice transcription:', error);
+    }
+}
+else {
+    console.log('🎤 Voice transcription disabled (no OPENAI_API_KEY)');
+}
 // 💰 TIME-BASED HEARTBEAT CONFIG (Oct 2025 - Credit-optimized)
 // Different intervals and probabilities based on time of day
 // Now properly saves credits because API is only called when probability succeeds!
@@ -356,6 +374,56 @@ client.on('messageCreate', async (message) => {
             const ct = att.contentType || att.content_type || '';
             if (typeof ct === 'string' && ct.startsWith('image/')) {
                 return;
+            }
+        }
+    }
+    // 🎤 VOICE NOTE TRANSCRIPTION (Dec 2025)
+    // Check for voice/audio attachments and transcribe them
+    if (voiceTranscriptionService && message.attachments?.size) {
+        for (const [, att] of message.attachments) {
+            const ct = att.contentType || att.content_type || '';
+            const fileName = att.name || '';
+            const audioUrl = att.url || '';
+            // Check if this is a voice/audio file
+            const isAudio = (typeof ct === 'string' && ct.startsWith('audio/')) ||
+                voiceTranscription_1.VoiceTranscriptionService.isSupportedAudioFile(fileName);
+            if (isAudio) {
+                console.log(`🎤 Voice note detected: ${fileName} (${ct})`);
+                try {
+                    // Transcribe the audio
+                    const transcription = await voiceTranscriptionService.transcribeAudio({
+                        audioUrl,
+                        fileName,
+                        language: undefined // Auto-detect language
+                    });
+                    if (transcription.success && transcription.text) {
+                        console.log(`✅ Transcription successful: "${transcription.text.substring(0, 100)}${transcription.text.length > 100 ? '...' : ''}"`);
+                        console.log(`🎤 Language: ${transcription.language || 'auto-detected'}, Duration: ${transcription.duration}ms`);
+                        // Replace message content with transcription
+                        // Create a pseudo-message with transcribed text
+                        const transcribedMessage = {
+                            ...message,
+                            content: `[Voice Note] ${transcription.text}`
+                        };
+                        // Continue processing with transcribed text
+                        // Fall through to normal message processing with modified content
+                        message.content = `[Voice Note] ${transcription.text}`;
+                        console.log(`🎤 Processing voice note as text message: "${message.content.substring(0, 100)}..."`);
+                    }
+                    else {
+                        console.error(`❌ Transcription failed: ${transcription.error}`);
+                        // Send error message back to user
+                        await message.reply(`⚠️ I couldn't transcribe your voice note: ${transcription.error}. Please try again or send a text message.`);
+                        return;
+                    }
+                }
+                catch (error) {
+                    console.error('❌ Error transcribing voice note:', error);
+                    await message.reply('⚠️ An error occurred while transcribing your voice note. Please try again or send a text message.');
+                    return;
+                }
+                // Break after processing first voice attachment
+                break;
             }
         }
     }
