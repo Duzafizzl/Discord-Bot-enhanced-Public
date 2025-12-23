@@ -30,6 +30,10 @@ import { initializeLogger, forceFlush, stopAutoFlush } from './conversationLogge
 // 🎤 VOICE TRANSCRIPTION (Whisper API)
 import { VoiceTranscriptionService } from './voiceTranscription';
 
+// 🎤 VOICE GENERATION (ElevenLabs TTS)
+import { ElevenLabsService } from './elevenlabs/elevenlabsService';
+import { DiscordVoiceSender } from './elevenlabs/discordVoiceSender';
+
 // 🤖 MCP HANDLER - Rider Pi Robot Control (Dec 2025)
 import { handleMCPCommand, initMCPHandler } from './mcpHandler';
 
@@ -134,6 +138,25 @@ if (OPENAI_API_KEY) {
   }
 } else {
   console.log('🎤 Voice transcription disabled (no OPENAI_API_KEY)');
+}
+
+// 🎤 Voice Generation Configuration (ElevenLabs)
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '';
+let elevenLabsService: ElevenLabsService | null = null;
+let discordVoiceSender: DiscordVoiceSender | null = null;
+
+// Initialize ElevenLabs if API key and voice ID are provided
+if (ELEVENLABS_API_KEY && ELEVENLABS_VOICE_ID) {
+  try {
+    elevenLabsService = new ElevenLabsService(ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID);
+    discordVoiceSender = new DiscordVoiceSender(elevenLabsService);
+    console.log('🎤 Voice generation enabled (ElevenLabs TTS)');
+  } catch (error) {
+    console.error('❌ Failed to initialize ElevenLabs:', error);
+  }
+} else {
+  console.log('🎤 Voice generation disabled (no ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID)');
 }
 
 // Time-based heartbeat configuration (configured timezone)
@@ -276,8 +299,16 @@ client.once('ready', async () => {
   
   // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 Berlin time
   startDailyStatsSummaryScheduler(client);
-  
-  // TTS initialization removed - using ElevenLabs integration instead
+
+  // 🎤 Initialize ElevenLabs voice generation service
+  if (elevenLabsService) {
+    try {
+      await elevenLabsService.initialize();
+      console.log('✅ ElevenLabs service initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize ElevenLabs service:', error);
+    }
+  }
 });
 
 // Helper function to send a message and receive a response
@@ -900,6 +931,145 @@ app.post('/api/midjourney/generate', (req, res) => {
   }
   })().catch((e: any) => {
     console.error('❌ [MJ Proxy] Uncaught error:', e);
+    res.status(500).json({ status: 'error', error: String(e?.message || e) });
+  });
+});
+
+// ============================================
+// Voice Message API Endpoint
+// ============================================
+
+/**
+ * POST /api/send-voice-message
+ *
+ * Substrate calls this endpoint to send voice messages via ElevenLabs
+ *
+ * Body params:
+ * - text (required): Text to convert to speech
+ * - target (required): Discord user ID or channel ID
+ * - target_type (optional): "user" or "channel" (auto-detected if not specified)
+ * - voice_id (optional): ElevenLabs voice ID
+ * - model_id (optional): ElevenLabs model ID (default: eleven_v3)
+ * - stability (optional): Voice stability (0.0-1.0)
+ * - similarity_boost (optional): Similarity boost (0.0-1.0)
+ * - style (optional): Style exaggeration (0.0-1.0)
+ * - use_speaker_boost (optional): Enable speaker boost
+ * - reply_to_message_id (optional): Discord message ID to reply to
+ */
+app.post('/api/send-voice-message', (req, res) => {
+  (async () => {
+    try {
+      // Check if ElevenLabs is configured
+      if (!discordVoiceSender || !elevenLabsService) {
+        return res.status(503).json({
+          status: 'error',
+          error: 'Voice message service not configured (missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID)'
+        });
+      }
+
+      // Validate required parameters
+      const { text, target, target_type } = req.body;
+
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Missing or invalid required parameter: text'
+        });
+      }
+
+      if (!target || typeof target !== 'string') {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Missing or invalid required parameter: target'
+        });
+      }
+
+      // Validate text length
+      if (text.length > 3000) {
+        return res.status(400).json({
+          status: 'error',
+          error: `Text too long (${text.length} characters). Maximum is 3000 characters.`
+        });
+      }
+
+      console.log(`🎤 [Voice API] Received request: text="${text.substring(0, 50)}...", target=${target}, target_type=${target_type || 'auto'}`);
+
+      // Determine target channel or DM
+      let targetChannel: any;
+      const isDM = target_type === 'user' || (target_type === 'auto' && target.startsWith('7'));
+
+      if (isDM) {
+        // Create DM channel
+        try {
+          const user = await client.users.fetch(target);
+          targetChannel = await user.createDM();
+          console.log(`🎤 [Voice API] Using DM channel for user ${user.username}`);
+        } catch (error) {
+          return res.status(404).json({
+            status: 'error',
+            error: `Failed to create DM with user ${target}: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      } else {
+        // Fetch channel
+        try {
+          targetChannel = await client.channels.fetch(target);
+          if (!targetChannel || !('send' in targetChannel)) {
+            return res.status(404).json({
+              status: 'error',
+              error: `Channel ${target} not found or is not a text channel`
+            });
+          }
+          console.log(`🎤 [Voice API] Using channel ${(targetChannel as any).name || target}`);
+        } catch (error) {
+          return res.status(404).json({
+            status: 'error',
+            error: `Failed to fetch channel ${target}: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      }
+
+      // Send voice message
+      const result = await discordVoiceSender.sendVoiceMessage({
+        text,
+        target: targetChannel,
+        voiceId: req.body.voice_id,
+        modelId: req.body.model_id,
+        stability: req.body.stability,
+        similarityBoost: req.body.similarity_boost,
+        style: req.body.style,
+        useSpeakerBoost: req.body.use_speaker_boost,
+        replyToMessageId: req.body.reply_to_message_id
+      });
+
+      if (result.success) {
+        console.log(`✅ [Voice API] Voice message sent successfully: message_id=${result.messageId}`);
+        return res.json({
+          status: 'success',
+          message: 'Voice message sent successfully',
+          message_id: result.messageId,
+          audio_size_bytes: result.audioSize,
+          generation_time_ms: result.duration,
+          target: target,
+          target_type: isDM ? 'dm' : 'channel'
+        });
+      } else {
+        console.error(`❌ [Voice API] Failed to send voice message: ${result.error}`);
+        return res.status(500).json({
+          status: 'error',
+          error: result.error || 'Unknown error occurred while sending voice message'
+        });
+      }
+
+    } catch (error: any) {
+      console.error('❌ [Voice API] Unexpected error:', error);
+      return res.status(500).json({
+        status: 'error',
+        error: error.message || String(error)
+      });
+    }
+  })().catch((e: any) => {
+    console.error('❌ [Voice API] Uncaught error:', e);
     res.status(500).json({ status: 'error', error: String(e?.message || e) });
   });
 });
