@@ -996,13 +996,14 @@ app.post('/api/send-voice-message', (req, res) => {
 
       // Determine target channel or DM
       let targetChannel: any;
-      const isDM = target_type === 'user' || (target_type === 'auto' && target.startsWith('7'));
+      let isDM = false;
 
-      if (isDM) {
-        // Create DM channel
+      if (target_type === 'user') {
+        // Explicit user - create DM
         try {
           const user = await client.users.fetch(target);
           targetChannel = await user.createDM();
+          isDM = true;
           console.log(`🎤 [Voice API] Using DM channel for user ${user.username}`);
         } catch (error) {
           return res.status(404).json({
@@ -1010,8 +1011,8 @@ app.post('/api/send-voice-message', (req, res) => {
             error: `Failed to create DM with user ${target}: ${error instanceof Error ? error.message : String(error)}`
           });
         }
-      } else {
-        // Fetch channel
+      } else if (target_type === 'channel') {
+        // Explicit channel - fetch channel
         try {
           targetChannel = await client.channels.fetch(target);
           if (!targetChannel || !('send' in targetChannel)) {
@@ -1026,6 +1027,33 @@ app.post('/api/send-voice-message', (req, res) => {
             status: 'error',
             error: `Failed to fetch channel ${target}: ${error instanceof Error ? error.message : String(error)}`
           });
+        }
+      } else {
+        // Auto-detect: try user first, then channel
+        // Discord IDs are indistinguishable, so we have to try both
+        try {
+          const user = await client.users.fetch(target);
+          targetChannel = await user.createDM();
+          isDM = true;
+          console.log(`🎤 [Voice API] Auto-detected as user DM for ${user.username}`);
+        } catch (userError) {
+          // Not a user, try as channel
+          console.log(`🎤 [Voice API] Not a user, trying as channel...`);
+          try {
+            targetChannel = await client.channels.fetch(target);
+            if (!targetChannel || !('send' in targetChannel)) {
+              return res.status(404).json({
+                status: 'error',
+                error: `Target ${target} is neither a valid user nor a text channel`
+              });
+            }
+            console.log(`🎤 [Voice API] Auto-detected as channel ${(targetChannel as any).name || target}`);
+          } catch (channelError) {
+            return res.status(404).json({
+              status: 'error',
+              error: `Failed to resolve target ${target} as user or channel. User error: ${userError instanceof Error ? userError.message : String(userError)}. Channel error: ${channelError instanceof Error ? channelError.message : String(channelError)}`
+            });
+          }
         }
       }
 
