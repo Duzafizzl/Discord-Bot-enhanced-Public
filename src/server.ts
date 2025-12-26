@@ -829,6 +829,138 @@ app.post('/api/midjourney/generate', (req, res) => {
 });
 
 // ============================================
+// Send Message API (for substrate integration)
+// ============================================
+
+app.post('/api/send-message', (req, res) => {
+  (async () => {
+    try {
+      const { message, target, target_type, mention_users, ping_everyone, ping_here } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ error: 'Missing required parameter: message' });
+      }
+
+      if (!target) {
+        return res.status(400).json({ error: 'Missing required parameter: target (channel ID or user ID)' });
+      }
+
+      // Determine channel ID
+      let channel_id = target;
+      let is_dm = false;
+
+      if (target_type === 'user') {
+        // Create DM channel
+        try {
+          const dmChannel = await client.users.fetch(target).then(user => user.createDM());
+          channel_id = dmChannel.id;
+          is_dm = true;
+        } catch (error) {
+          return res.status(500).json({
+            error: `Failed to create DM channel: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      } else if (!target_type || target_type === 'channel') {
+        // Use target as channel ID directly
+        channel_id = target;
+        is_dm = false;
+      } else {
+        return res.status(400).json({ error: `Invalid target_type: ${target_type}. Must be 'user' or 'channel'` });
+      }
+
+      // Get the channel
+      const channel = await client.channels.fetch(channel_id);
+      if (!channel || !('send' in channel)) {
+        return res.status(500).json({ error: 'Channel not found or cannot send messages to it' });
+      }
+
+      // Build message content with mentions
+      let messageContent = message;
+
+      if (target_type === 'channel') {
+        if (ping_everyone) {
+          messageContent = `@everyone ${message}`;
+        } else if (ping_here) {
+          messageContent = `@here ${message}`;
+        } else if (mention_users && Array.isArray(mention_users) && mention_users.length > 0) {
+          const mentions = mention_users.map(userId => `<@${userId}>`).join(' ');
+          messageContent = `${mentions} ${message}`;
+        }
+      }
+
+      // Auto-chunk messages over 2000 characters
+      const MAX_LENGTH = 2000;
+      const chunks: string[] = [];
+
+      if (messageContent.length <= MAX_LENGTH) {
+        chunks.push(messageContent);
+      } else {
+        // Split by newlines to preserve structure
+        let currentChunk = '';
+        for (const line of messageContent.split('\n')) {
+          if (currentChunk.length + line.length + 1 <= MAX_LENGTH) {
+            currentChunk += line + '\n';
+          } else {
+            if (currentChunk) {
+              chunks.push(currentChunk.trimEnd());
+            }
+            currentChunk = line + '\n';
+          }
+        }
+        if (currentChunk) {
+          chunks.push(currentChunk.trimEnd());
+        }
+
+        // Handle single lines that are too long
+        const finalChunks: string[] = [];
+        for (const chunk of chunks) {
+          if (chunk.length <= MAX_LENGTH) {
+            finalChunks.push(chunk);
+          } else {
+            for (let i = 0; i < chunk.length; i += MAX_LENGTH) {
+              finalChunks.push(chunk.slice(i, i + MAX_LENGTH));
+            }
+          }
+        }
+        chunks.length = 0;
+        chunks.push(...finalChunks);
+      }
+
+      // Send all chunks
+      const sentMessages = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const sentMsg = await channel.send(chunks[i]);
+        sentMessages.push({
+          message_id: sentMsg.id,
+          chunk: i + 1,
+          total_chunks: chunks.length
+        });
+      }
+
+      return res.json({
+        status: 'success',
+        message: `Message sent to ${is_dm ? 'user' : 'channel'} ${target} (${chunks.length} chunk${chunks.length > 1 ? 's' : ''})`,
+        message_ids: sentMessages.map(m => m.message_id),
+        chunks_sent: chunks.length,
+        channel_id: channel_id,
+        target_type: is_dm ? 'dm' : 'channel',
+        mentions_added: ping_everyone || ping_here || (mention_users && mention_users.length > 0)
+      });
+
+    } catch (error: any) {
+      console.error('❌ [Send Message API] Error:', error);
+      return res.status(500).json({
+        status: 'error',
+        error: error.message || String(error)
+      });
+    }
+  })().catch((e: any) => {
+    console.error('❌ [Send Message API] Uncaught error:', e);
+    res.status(500).json({ status: 'error', error: String(e?.message || e) });
+  });
+});
+
+// ============================================
 // Health Check Endpoints
 // ============================================
 
