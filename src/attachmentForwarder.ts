@@ -606,18 +606,30 @@ async function forwardImagesToGrok(
         ? `${contextPrefix} ${userText}`
         : `${contextPrefix} Describe the image(s).`;
 
-      // Extract base64 strings from the image objects
-      // nate_api_substrate uses Ollama-style API format (images as array of base64 strings)
-      const base64Strings = base64Images.map((img: any) => img.source.data);
+      // ✅ Build request payload using OpenAI/Grok multimodal format
+      // Format: content as array with text and image_url objects
+      // This format is supported by nate_api_substrate for multimodal messages
+      const contentArray: any[] = [
+        { type: 'text', text: textContent }
+      ];
 
-      // ✅ Build request payload using nate_api_substrate's API format
-      // Format: images array + content string (Ollama-style specification)
+      // Add each image as an image_url object with data URI
+      for (const img of base64Images) {
+        const mediaType = img.source.mediaType || 'image/jpeg';
+        const base64Data = img.source.data;
+        contentArray.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${mediaType};base64,${base64Data}`
+          }
+        });
+      }
+
       const payload: any = {
         messages: [
           {
             role: 'user',
-            content: textContent,
-            images: base64Strings  // Array of base64-encoded image strings
+            content: contentArray  // OpenAI/Grok multimodal format
           }
         ]
       };
