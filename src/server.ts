@@ -27,6 +27,13 @@ import { handleAdminCommand } from './adminCommands';
 // 📝 CONVERSATION LOGGER (for training data)
 import { initializeLogger, forceFlush, stopAutoFlush } from './conversationLogger';
 
+// 🎤 VOICE TRANSCRIPTION (Whisper API)
+import { VoiceTranscriptionService } from './voiceTranscription';
+
+// 🎤 VOICE GENERATION (ElevenLabs TTS)
+import { ElevenLabsService } from './elevenlabs/elevenlabsService';
+import { DiscordVoiceSender } from './elevenlabs/discordVoiceSender';
+
 // 🤖 MCP HANDLER - Rider Pi Robot Control (Dec 2025)
 import { handleMCPCommand, initMCPHandler } from './mcpHandler';
 
@@ -116,6 +123,41 @@ const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const HEARTBEAT_LOG_CHANNEL_ID = process.env.HEARTBEAT_LOG_CHANNEL_ID;
 const MESSAGE_REPLY_TRUNCATE_LENGTH = 100;
 const ENABLE_TIMER = process.env.ENABLE_TIMER === 'true';
+
+// 🎤 Voice Transcription Configuration
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+let voiceTranscriptionService: VoiceTranscriptionService | null = null;
+
+// Initialize voice transcription if API key is provided
+if (OPENAI_API_KEY) {
+  try {
+    voiceTranscriptionService = new VoiceTranscriptionService(OPENAI_API_KEY);
+    console.log('🎤 Voice transcription enabled (OpenAI Whisper)');
+  } catch (error) {
+    console.error('❌ Failed to initialize voice transcription:', error);
+  }
+} else {
+  console.log('🎤 Voice transcription disabled (no OPENAI_API_KEY)');
+}
+
+// 🎤 Voice Generation Configuration (ElevenLabs)
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '';
+let elevenLabsService: ElevenLabsService | null = null;
+let discordVoiceSender: DiscordVoiceSender | null = null;
+
+// Initialize ElevenLabs if API key and voice ID are provided
+if (ELEVENLABS_API_KEY && ELEVENLABS_VOICE_ID) {
+  try {
+    elevenLabsService = new ElevenLabsService(ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID);
+    discordVoiceSender = new DiscordVoiceSender(elevenLabsService);
+    console.log('🎤 Voice generation enabled (ElevenLabs TTS)');
+  } catch (error) {
+    console.error('❌ Failed to initialize ElevenLabs:', error);
+  }
+} else {
+  console.log('🎤 Voice generation disabled (no ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID)');
+}
 
 // Time-based heartbeat configuration (configured timezone)
 interface HeartbeatConfig {
@@ -257,8 +299,16 @@ client.once('ready', async () => {
   
   // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 Berlin time
   startDailyStatsSummaryScheduler(client);
-  
-  // TTS initialization removed - using ElevenLabs integration instead
+
+  // 🎤 Initialize ElevenLabs voice generation service
+  if (elevenLabsService) {
+    try {
+      await elevenLabsService.initialize();
+      console.log('✅ ElevenLabs service initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize ElevenLabs service:', error);
+    }
+  }
 });
 
 // Helper function to send a message and receive a response
@@ -401,7 +451,7 @@ client.on('messageCreate', async (message) => {
   if (ENABLE_AUTONOMOUS && client.user?.id && message.author.id !== client.user.id) {
     trackMessage(message, client.user.id);
   }
-  
+
   // Let the attachment forwarder handle image attachments
   if (message.attachments?.size) {
     for (const [, att] of message.attachments) {
@@ -411,7 +461,65 @@ client.on('messageCreate', async (message) => {
       }
     }
   }
-  
+
+  // 🎤 VOICE NOTE TRANSCRIPTION (Dec 2025)
+  // Check for voice/audio attachments and transcribe them
+  // ONLY transcribe voice notes from USERS, not from the bot itself (checked later)
+  if (voiceTranscriptionService && message.attachments?.size && message.author.id !== client.user?.id) {
+    for (const [, att] of message.attachments) {
+      const ct = (att as any).contentType || (att as any).content_type || '';
+      const fileName = (att as any).name || '';
+      const audioUrl = (att as any).url || '';
+
+      // Check if this is a voice/audio file
+      const isAudio = (typeof ct === 'string' && ct.startsWith('audio/')) ||
+                      VoiceTranscriptionService.isSupportedAudioFile(fileName);
+
+      if (isAudio) {
+        console.log(`🎤 Voice note detected: ${fileName} (${ct})`);
+
+        try {
+          // Transcribe the audio
+          const transcription = await voiceTranscriptionService.transcribeAudio({
+            audioUrl,
+            fileName,
+            language: undefined // Auto-detect language
+          });
+
+          if (transcription.success && transcription.text) {
+            console.log(`✅ Transcription successful: "${transcription.text.substring(0, 100)}${transcription.text.length > 100 ? '...' : ''}"`);
+            console.log(`🎤 Language: ${transcription.language || 'auto-detected'}, Duration: ${transcription.duration}ms`);
+
+            // Replace message content with transcription
+            // Create a pseudo-message with transcribed text
+            const transcribedMessage = {
+              ...message,
+              content: `[Voice Note] ${transcription.text}`
+            };
+
+            // Continue processing with transcribed text
+            // Fall through to normal message processing with modified content
+            (message as any).content = `[Voice Note] ${transcription.text}`;
+            console.log(`🎤 Processing voice note as text message: "${message.content.substring(0, 100)}..."`);
+          } else {
+            console.error(`❌ Transcription failed: ${transcription.error}`);
+
+            // Send error message back to user
+            await message.reply(`⚠️ I couldn't transcribe your voice note: ${transcription.error}. Please try again or send a text message.`);
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error transcribing voice note:', error);
+          await message.reply('⚠️ An error occurred while transcribing your voice note. Please try again or send a text message.');
+          return;
+        }
+
+        // Break after processing first voice attachment
+        break;
+      }
+    }
+  }
+
   // 🤖 MCP COMMAND HANDLER - Rider Pi Robot Control (Dec 2025)
   // Process MCP commands from the dedicated channel BEFORE other filters
   // This allows Letta to control the robot via Discord messages
@@ -425,12 +533,12 @@ client.on('messageCreate', async (message) => {
     return;
   }
   console.log(`✅ [CHANNEL FILTER] Passed channel filter check`);
-  
+
   if (message.author.id === client.user?.id) {
-    console.log(`📩 Ignoring message from myself (NOT sending to Letta - saves credits!)...`);
+    console.log(`📩 Ignoring message from myself (NOT sending to substrate - saves credits!)...`);
     return;
   }
-  
+
   // 🛠️ ADMIN COMMAND HANDLER (Oct 16, 2025)
   // CRITICAL: Check BEFORE autonomous mode to prevent blocking!
   // Admin commands should ALWAYS work, even with autonomous mode enabled
@@ -824,6 +932,305 @@ app.post('/api/midjourney/generate', (req, res) => {
   }
   })().catch((e: any) => {
     console.error('❌ [MJ Proxy] Uncaught error:', e);
+    res.status(500).json({ status: 'error', error: String(e?.message || e) });
+  });
+});
+
+// ============================================
+// Voice Message API Endpoint
+// ============================================
+
+/**
+ * POST /api/send-voice-message
+ *
+ * Substrate calls this endpoint to send voice messages via ElevenLabs
+ *
+ * Body params:
+ * - text (required): Text to convert to speech
+ * - target (required): Discord user ID or channel ID
+ * - target_type (optional): "user" or "channel" (auto-detected if not specified)
+ * - voice_id (optional): ElevenLabs voice ID
+ * - model_id (optional): ElevenLabs model ID (default: eleven_v3)
+ * - stability (optional): Voice stability (0.0-1.0)
+ * - similarity_boost (optional): Similarity boost (0.0-1.0)
+ * - style (optional): Style exaggeration (0.0-1.0)
+ * - use_speaker_boost (optional): Enable speaker boost
+ * - reply_to_message_id (optional): Discord message ID to reply to
+ */
+app.post('/api/send-voice-message', (req, res) => {
+  (async () => {
+    try {
+      // Check if ElevenLabs is configured
+      if (!discordVoiceSender || !elevenLabsService) {
+        return res.status(503).json({
+          status: 'error',
+          error: 'Voice message service not configured (missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID)'
+        });
+      }
+
+      // Validate required parameters
+      const { text, target, target_type } = req.body;
+
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Missing or invalid required parameter: text'
+        });
+      }
+
+      if (!target || typeof target !== 'string') {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Missing or invalid required parameter: target'
+        });
+      }
+
+      // Validate text length
+      if (text.length > 3000) {
+        return res.status(400).json({
+          status: 'error',
+          error: `Text too long (${text.length} characters). Maximum is 3000 characters.`
+        });
+      }
+
+      console.log(`🎤 [Voice API] Received request: text="${text.substring(0, 50)}...", target=${target}, target_type=${target_type || 'auto'}`);
+
+      // Determine target channel or DM
+      let targetChannel: any;
+      let isDM = false;
+
+      if (target_type === 'user') {
+        // Explicit user - create DM
+        try {
+          const user = await client.users.fetch(target);
+          targetChannel = await user.createDM();
+          isDM = true;
+          console.log(`🎤 [Voice API] Using DM channel for user ${user.username}`);
+        } catch (error) {
+          return res.status(404).json({
+            status: 'error',
+            error: `Failed to create DM with user ${target}: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      } else if (target_type === 'channel') {
+        // Explicit channel - fetch channel
+        try {
+          targetChannel = await client.channels.fetch(target);
+          if (!targetChannel || !('send' in targetChannel)) {
+            return res.status(404).json({
+              status: 'error',
+              error: `Channel ${target} not found or is not a text channel`
+            });
+          }
+          console.log(`🎤 [Voice API] Using channel ${(targetChannel as any).name || target}`);
+        } catch (error) {
+          return res.status(404).json({
+            status: 'error',
+            error: `Failed to fetch channel ${target}: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      } else {
+        // Auto-detect: try user first, then channel
+        // Discord IDs are indistinguishable, so we have to try both
+        try {
+          const user = await client.users.fetch(target);
+          targetChannel = await user.createDM();
+          isDM = true;
+          console.log(`🎤 [Voice API] Auto-detected as user DM for ${user.username}`);
+        } catch (userError) {
+          // Not a user, try as channel
+          console.log(`🎤 [Voice API] Not a user, trying as channel...`);
+          try {
+            targetChannel = await client.channels.fetch(target);
+            if (!targetChannel || !('send' in targetChannel)) {
+              return res.status(404).json({
+                status: 'error',
+                error: `Target ${target} is neither a valid user nor a text channel`
+              });
+            }
+            console.log(`🎤 [Voice API] Auto-detected as channel ${(targetChannel as any).name || target}`);
+          } catch (channelError) {
+            return res.status(404).json({
+              status: 'error',
+              error: `Failed to resolve target ${target} as user or channel. User error: ${userError instanceof Error ? userError.message : String(userError)}. Channel error: ${channelError instanceof Error ? channelError.message : String(channelError)}`
+            });
+          }
+        }
+      }
+
+      // Send voice message
+      const result = await discordVoiceSender.sendVoiceMessage({
+        text,
+        target: targetChannel,
+        voiceId: req.body.voice_id,
+        modelId: req.body.model_id,
+        stability: req.body.stability,
+        similarityBoost: req.body.similarity_boost,
+        style: req.body.style,
+        useSpeakerBoost: req.body.use_speaker_boost,
+        replyToMessageId: req.body.reply_to_message_id
+      });
+
+      if (result.success) {
+        console.log(`✅ [Voice API] Voice message sent successfully: message_id=${result.messageId}`);
+        return res.json({
+          status: 'success',
+          message: 'Voice message sent successfully',
+          message_id: result.messageId,
+          audio_size_bytes: result.audioSize,
+          generation_time_ms: result.duration,
+          target: target,
+          target_type: isDM ? 'dm' : 'channel'
+        });
+      } else {
+        console.error(`❌ [Voice API] Failed to send voice message: ${result.error}`);
+        return res.status(500).json({
+          status: 'error',
+          error: result.error || 'Unknown error occurred while sending voice message'
+        });
+      }
+
+    } catch (error: any) {
+      console.error('❌ [Voice API] Unexpected error:', error);
+      return res.status(500).json({
+        status: 'error',
+        error: error.message || String(error)
+      });
+    }
+  })().catch((e: any) => {
+    console.error('❌ [Voice API] Uncaught error:', e);
+    res.status(500).json({ status: 'error', error: String(e?.message || e) });
+  });
+});
+
+// ============================================
+// Send Message API (for substrate integration)
+// ============================================
+
+app.post('/api/send-message', (req, res) => {
+  (async () => {
+    try {
+      const { message, target, target_type, mention_users, ping_everyone, ping_here } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ error: 'Missing required parameter: message' });
+      }
+
+      if (!target) {
+        return res.status(400).json({ error: 'Missing required parameter: target (channel ID or user ID)' });
+      }
+
+      // Determine channel ID
+      let channel_id = target;
+      let is_dm = false;
+
+      if (target_type === 'user') {
+        // Create DM channel
+        try {
+          const dmChannel = await client.users.fetch(target).then(user => user.createDM());
+          channel_id = dmChannel.id;
+          is_dm = true;
+        } catch (error) {
+          return res.status(500).json({
+            error: `Failed to create DM channel: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      } else if (!target_type || target_type === 'channel') {
+        // Use target as channel ID directly
+        channel_id = target;
+        is_dm = false;
+      } else {
+        return res.status(400).json({ error: `Invalid target_type: ${target_type}. Must be 'user' or 'channel'` });
+      }
+
+      // Get the channel
+      const channel = await client.channels.fetch(channel_id);
+      if (!channel || !('send' in channel)) {
+        return res.status(500).json({ error: 'Channel not found or cannot send messages to it' });
+      }
+
+      // Build message content with mentions
+      let messageContent = message;
+
+      if (target_type === 'channel') {
+        if (ping_everyone) {
+          messageContent = `@everyone ${message}`;
+        } else if (ping_here) {
+          messageContent = `@here ${message}`;
+        } else if (mention_users && Array.isArray(mention_users) && mention_users.length > 0) {
+          const mentions = mention_users.map(userId => `<@${userId}>`).join(' ');
+          messageContent = `${mentions} ${message}`;
+        }
+      }
+
+      // Auto-chunk messages over 2000 characters
+      const MAX_LENGTH = 2000;
+      const chunks: string[] = [];
+
+      if (messageContent.length <= MAX_LENGTH) {
+        chunks.push(messageContent);
+      } else {
+        // Split by newlines to preserve structure
+        let currentChunk = '';
+        for (const line of messageContent.split('\n')) {
+          if (currentChunk.length + line.length + 1 <= MAX_LENGTH) {
+            currentChunk += line + '\n';
+          } else {
+            if (currentChunk) {
+              chunks.push(currentChunk.trimEnd());
+            }
+            currentChunk = line + '\n';
+          }
+        }
+        if (currentChunk) {
+          chunks.push(currentChunk.trimEnd());
+        }
+
+        // Handle single lines that are too long
+        const finalChunks: string[] = [];
+        for (const chunk of chunks) {
+          if (chunk.length <= MAX_LENGTH) {
+            finalChunks.push(chunk);
+          } else {
+            for (let i = 0; i < chunk.length; i += MAX_LENGTH) {
+              finalChunks.push(chunk.slice(i, i + MAX_LENGTH));
+            }
+          }
+        }
+        chunks.length = 0;
+        chunks.push(...finalChunks);
+      }
+
+      // Send all chunks
+      const sentMessages = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const sentMsg = await channel.send(chunks[i]);
+        sentMessages.push({
+          message_id: sentMsg.id,
+          chunk: i + 1,
+          total_chunks: chunks.length
+        });
+      }
+
+      return res.json({
+        status: 'success',
+        message: `Message sent to ${is_dm ? 'user' : 'channel'} ${target} (${chunks.length} chunk${chunks.length > 1 ? 's' : ''})`,
+        message_ids: sentMessages.map(m => m.message_id),
+        chunks_sent: chunks.length,
+        channel_id: channel_id,
+        target_type: is_dm ? 'dm' : 'channel',
+        mentions_added: ping_everyone || ping_here || (mention_users && mention_users.length > 0)
+      });
+
+    } catch (error: any) {
+      console.error('❌ [Send Message API] Error:', error);
+      return res.status(500).json({
+        status: 'error',
+        error: error.message || String(error)
+      });
+    }
+  })().catch((e: any) => {
+    console.error('❌ [Send Message API] Uncaught error:', e);
     res.status(500).json({ status: 'error', error: String(e?.message || e) });
   });
 });
