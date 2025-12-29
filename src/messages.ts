@@ -22,7 +22,7 @@ export enum MessageType {
 // Grok Client Configuration
 const GROK_BASE_URL = process.env.GROK_BASE_URL || 'http://localhost:8091';
 const GROK_SESSION_ID = process.env.GROK_SESSION_ID || 'discord-bot';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-4-1-fast-reasoning';
+const GROK_MODEL = process.env.GROK_MODEL || 'mistralai/mistral-large-2512';
 const GROK_MAX_TOKENS = parseInt(process.env.GROK_MAX_TOKENS || '8192', 10);  // Allow longer responses
 const USE_SENDER_PREFIX = process.env.USE_SENDER_PREFIX === 'true';
 const SURFACE_ERRORS = process.env.SURFACE_ERRORS === 'true';
