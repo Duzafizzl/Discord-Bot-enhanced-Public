@@ -37,6 +37,9 @@ import { DiscordVoiceSender } from './elevenlabs/discordVoiceSender';
 // 🤖 MCP HANDLER - Rider Pi Robot Control (Dec 2025)
 import { handleMCPCommand, initMCPHandler } from './mcpHandler';
 
+// 🎤 VOICE CHANNEL SUPPORT - Real-time voice conversations (Jan 2026)
+import { handleVoiceCommand, initVoiceSystem, shutdownVoiceSystem } from './voice/voiceCommands';
+
 // ============================================
 // 🛡️ GLOBAL ERROR HANDLERS (Nov 2025)
 // ============================================
@@ -74,7 +77,16 @@ process.on('uncaughtException', (error: Error) => {
 // Ensure conversation logs are flushed before shutdown
 async function gracefulShutdown(signal: string) {
   console.log(`\n🛑 Received ${signal} - performing graceful shutdown...`);
-  
+
+  try {
+    // 🎤 Disconnect from voice channels
+    console.log('🎤 Disconnecting from voice channels...');
+    await shutdownVoiceSystem();
+    console.log('✅ Voice system shut down');
+  } catch (error) {
+    console.error('❌ Error shutting down voice system:', error);
+  }
+
   try {
     // Flush conversation logs before exit
     console.log('📝 Flushing conversation logs...');
@@ -84,10 +96,10 @@ async function gracefulShutdown(signal: string) {
   } catch (error) {
     console.error('❌ Error flushing conversation logs:', error);
   }
-  
+
   // Give a moment for logs to be written
   await new Promise(resolve => setTimeout(resolve, 1000));
-  
+
   console.log('👋 Shutting down gracefully...');
   process.exit(0);
 }
@@ -249,6 +261,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildVoiceStates,  // 🎤 Required for voice channel support
   ],
   partials: [Partials.Channel]
 });
@@ -309,6 +322,9 @@ client.once('ready', async () => {
       console.error('❌ Failed to initialize ElevenLabs service:', error);
     }
   }
+
+  // 🎤 Initialize Voice Channel Support (Jan 2026)
+  initVoiceSystem(client);
 });
 
 // Helper function to send a message and receive a response
@@ -544,14 +560,22 @@ client.on('messageCreate', async (message) => {
   // Admin commands should ALWAYS work, even with autonomous mode enabled
   if (message.content.startsWith('!') && client.user?.id) {
     const adminResponse = await handleAdminCommand(message, client.user.id);
-    
+
     if (adminResponse) {
       // Admin command was handled
       await message.reply(adminResponse);
       return;
     }
-    
-    // Not an admin command, continue to autonomous check
+
+    // 🎤 VOICE COMMAND HANDLER (Jan 2026)
+    // Check for voice commands (!join, !leave, !talk, !mute, !unmute)
+    const voiceResponse = await handleVoiceCommand(message);
+    if (voiceResponse) {
+      await message.reply(voiceResponse);
+      return;
+    }
+
+    // Not an admin or voice command, continue to autonomous check
     // (autonomous will ignore it anyway)
   }
   
@@ -1299,6 +1323,7 @@ app.listen(PORT, () => {
   console.log(`  - Discord Bot: ${RESPOND_TO_DMS || RESPOND_TO_MENTIONS || RESPOND_TO_GENERIC ? 'Enabled' : 'Disabled'}`);
   console.log(`  - Heartbeat: ${ENABLE_TIMER ? 'Enabled' : 'Disabled'}`);
   console.log(`  - TTS API: Disabled (using ElevenLabs integration instead)`);
+  console.log(`  - Voice Channels: ${process.env.VOICE_ENABLED === 'true' ? 'ENABLED 🎤' : 'Disabled'}`);
   console.log(`  - Bot-Loop Prevention: ${ENABLE_AUTONOMOUS ? 'ENABLED 🔒' : 'DISABLED ⚠️'}`);
   // 🔒 DM RESTRICTION STATUS
   if (ALLOWED_DM_USER_ID) {
