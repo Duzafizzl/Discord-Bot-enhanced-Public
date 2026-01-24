@@ -30,6 +30,8 @@ const elevenlabsService_1 = require("./elevenlabs/elevenlabsService");
 const discordVoiceSender_1 = require("./elevenlabs/discordVoiceSender");
 // 🤖 MCP HANDLER - Rider Pi Robot Control (Dec 2025)
 const mcpHandler_1 = require("./mcpHandler");
+// 🎤 VOICE CHANNEL SUPPORT - Real-time voice conversations (Jan 2026)
+const voiceCommands_1 = require("./voice/voiceCommands");
 // ============================================
 // 🛡️ GLOBAL ERROR HANDLERS (Nov 2025)
 // ============================================
@@ -63,6 +65,15 @@ process.on('uncaughtException', (error) => {
 // Ensure conversation logs are flushed before shutdown
 async function gracefulShutdown(signal) {
     console.log(`\n🛑 Received ${signal} - performing graceful shutdown...`);
+    try {
+        // 🎤 Disconnect from voice channels
+        console.log('🎤 Disconnecting from voice channels...');
+        await (0, voiceCommands_1.shutdownVoiceSystem)();
+        console.log('✅ Voice system shut down');
+    }
+    catch (error) {
+        console.error('❌ Error shutting down voice system:', error);
+    }
     try {
         // Flush conversation logs before exit
         console.log('📝 Flushing conversation logs...');
@@ -218,6 +229,7 @@ const client = new discord_js_1.Client({
         discord_js_1.GatewayIntentBits.GuildMessages,
         discord_js_1.GatewayIntentBits.MessageContent,
         discord_js_1.GatewayIntentBits.DirectMessages,
+        discord_js_1.GatewayIntentBits.GuildVoiceStates, // 🎤 Required for voice channel support
     ],
     partials: [discord_js_1.Partials.Channel]
 });
@@ -269,6 +281,8 @@ client.once('ready', async () => {
             console.error('❌ Failed to initialize ElevenLabs service:', error);
         }
     }
+    // 🎤 Initialize Voice Channel Support (Jan 2026)
+    (0, voiceCommands_1.initVoiceSystem)(client);
 });
 // Helper function to send a message and receive a response
 async function processAndSendMessage(message, messageType, conversationContext = null, customContent = null) {
@@ -485,7 +499,14 @@ client.on('messageCreate', async (message) => {
             await message.reply(adminResponse);
             return;
         }
-        // Not an admin command, continue to autonomous check
+        // 🎤 VOICE COMMAND HANDLER (Jan 2026)
+        // Check for voice commands (!join, !leave, !talk, !mute, !unmute)
+        const voiceResponse = await (0, voiceCommands_1.handleVoiceCommand)(message);
+        if (voiceResponse) {
+            await message.reply(voiceResponse);
+            return;
+        }
+        // Not an admin or voice command, continue to autonomous check
         // (autonomous will ignore it anyway)
     }
     // 🔒 AUTONOMOUS: Check if we should respond (bot-loop prevention)
@@ -688,12 +709,24 @@ client.on('messageCreate', async (message) => {
             }
             // 📦 CHUNKING: Split long messages to avoid Discord's 2000 char limit
             if (msg.length <= 1900) {
-                await message.reply(msg);
+                // For DMs, send directly instead of replying (avoids routing issues)
+                if (message.channel.type === 1) { // 1 = DM channel type in Discord.js
+                    await message.author.send(msg);
+                }
+                else {
+                    await message.reply(msg);
+                }
                 console.log(`📨 Message sent: ${msg.substring(0, 100)}...`);
             }
             else {
                 const chunks = chunkText(msg, 1900);
-                await message.reply(chunks[0]);
+                // For DMs, send directly instead of replying (avoids routing issues)
+                if (message.channel.type === 1) { // 1 = DM channel type in Discord.js
+                    await message.author.send(chunks[0]);
+                }
+                else {
+                    await message.reply(chunks[0]);
+                }
                 for (let i = 1; i < chunks.length; i++) {
                     await new Promise(r => setTimeout(r, 200));
                     await message.channel.send(chunks[i]);
@@ -1161,6 +1194,7 @@ app.listen(PORT, () => {
     console.log(`  - Discord Bot: ${RESPOND_TO_DMS || RESPOND_TO_MENTIONS || RESPOND_TO_GENERIC ? 'Enabled' : 'Disabled'}`);
     console.log(`  - Heartbeat: ${ENABLE_TIMER ? 'Enabled' : 'Disabled'}`);
     console.log(`  - TTS API: Disabled (using ElevenLabs integration instead)`);
+    console.log(`  - Voice Channels: ${process.env.VOICE_ENABLED === 'true' ? 'ENABLED 🎤' : 'Disabled'}`);
     console.log(`  - Bot-Loop Prevention: ${ENABLE_AUTONOMOUS ? 'ENABLED 🔒' : 'DISABLED ⚠️'}`);
     // 🔒 DM RESTRICTION STATUS
     if (ALLOWED_DM_USER_ID) {
