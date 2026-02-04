@@ -67,61 +67,56 @@ async function readTasksFromChannel() {
  * @param referenceDate Reference date in UTC to attach the time to
  * @returns Date in UTC with the specified time (interpreted in configured timezone)
  */
-function parseTimeInBerlinThenUTC(timeStr, referenceDate) {
+function parseTimeInConfiguredTimezone(timeStr, referenceDate) {
     const [hour, minute] = timeStr.split(':').map(Number);
     // Get the date parts in configured timezone for the reference date
-    const berlinDateStr = referenceDate.toLocaleString('en-CA', {
+    const localDateStr = referenceDate.toLocaleString('en-CA', {
         timeZone: TIMEZONE,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
     });
-    // berlinDateStr is "YYYY-MM-DD"
-    // Create ISO string with the desired Berlin time
-    const berlinISO = `${berlinDateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
-    // We need to find the UTC time that corresponds to this Berlin time
-    // Strategy: Try different UTC times and see which one gives us the desired Berlin time
-    // Start with an estimate: Berlin is typically UTC+1 (CET) or UTC+2 (CEST)
-    // So if we want 14:00 Berlin, try 13:00 UTC (CET) or 12:00 UTC (CEST)
-    // Try UTC+1 first (CET - winter time)
-    // Create date string with timezone offset: if Berlin is UTC+1, then 14:00 Berlin = 13:00 UTC
-    let testUTC = new Date(`${berlinISO}+01:00`);
-    let testBerlin = new Intl.DateTimeFormat('en-US', {
-        timeZone: TIMEZONE,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    }).formatToParts(testUTC);
-    let testHour = parseInt(testBerlin.find(p => p.type === 'hour')?.value || '0', 10);
-    let testMin = parseInt(testBerlin.find(p => p.type === 'minute')?.value || '0', 10);
-    // If it doesn't match, try different UTC offset (for DST handling)
-    if (testHour !== hour || testMin !== minute) {
-        testUTC = new Date(`${berlinISO}+02:00`);
-        testBerlin = new Intl.DateTimeFormat('en-US', {
+    // localDateStr is "YYYY-MM-DD"
+    // Create a target datetime string
+    const targetTimeStr = `${localDateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    // Use a binary search approach to find the correct UTC time
+    // Start with an initial guess assuming UTC (offset 0)
+    let testUTC = new Date(`${targetTimeStr}Z`);
+    // Get what time it actually is in the target timezone
+    const getLocalHourMin = (date) => {
+        const parts = new Intl.DateTimeFormat('en-US', {
             timeZone: TIMEZONE,
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
-        }).formatToParts(testUTC);
-        testHour = parseInt(testBerlin.find(p => p.type === 'hour')?.value || '0', 10);
-        testMin = parseInt(testBerlin.find(p => p.type === 'minute')?.value || '0', 10);
-    }
-    // If still doesn't match, do binary search or iterative adjustment
+        }).formatToParts(date);
+        const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+        const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+        return [h, m];
+    };
+    let [testHour, testMin] = getLocalHourMin(testUTC);
+    // Calculate the difference and adjust
+    // This handles any timezone offset (positive or negative)
     if (testHour !== hour || testMin !== minute) {
-        // Calculate difference and adjust
-        const hourDiff = hour - testHour;
-        const minDiff = minute - testMin;
-        testUTC.setUTCHours(testUTC.getUTCHours() + hourDiff);
-        testUTC.setUTCMinutes(testUTC.getUTCMinutes() + minDiff);
+        // Calculate total minutes difference
+        const targetMinutes = hour * 60 + minute;
+        const actualMinutes = testHour * 60 + testMin;
+        let diffMinutes = targetMinutes - actualMinutes;
+        // Handle day boundary wrap-around
+        if (diffMinutes > 12 * 60)
+            diffMinutes -= 24 * 60;
+        if (diffMinutes < -12 * 60)
+            diffMinutes += 24 * 60;
+        testUTC = new Date(testUTC.getTime() - diffMinutes * 60 * 1000);
     }
     return testUTC;
 }
 /**
- * Parse an ISO datetime string without timezone as Berlin time and convert to UTC
+ * Parse an ISO datetime string without timezone as configured timezone and convert to UTC
  * @param isoStr ISO string like "2025-01-15T20:30:00" (without timezone)
  * @returns Date in UTC
  */
-function parseNaiveDateTimeAsBerlin(isoStr) {
+function parseNaiveDateTimeAsConfiguredTimezone(isoStr) {
     // Remove microseconds if present
     const cleanStr = isoStr.replace(/\.\d+$/, '');
     // Extract date and time parts
@@ -131,15 +126,15 @@ function parseNaiveDateTimeAsBerlin(isoStr) {
         return new Date(cleanStr + 'Z');
     }
     const [, dateStr, hourStr, minuteStr] = match;
-    // Use the existing parseTimeInBerlinThenUTC function
+    // Use the existing parseTimeInConfiguredTimezone function
     // Create a reference date from the date part
     const refDate = new Date(dateStr + 'T00:00:00Z');
-    return parseTimeInBerlinThenUTC(`${hourStr}:${minuteStr}`, refDate);
+    return parseTimeInConfiguredTimezone(`${hourStr}:${minuteStr}`, refDate);
 }
 function checkDueTasks(tasks) {
     // Always use UTC for comparison to avoid timezone issues
     // next_run from Python tool is stored without timezone (naive datetime)
-    // We interpret it as Berlin time and convert to UTC for comparison
+    // We interpret it as configured timezone and convert to UTC for comparison
     const now = new Date(); // This is already in UTC internally (JavaScript Date is always UTC)
     const due = [];
     for (const t of tasks) {
@@ -155,9 +150,9 @@ function checkDueTasks(tasks) {
             nextRun = new Date(nextRunStr);
         }
         else {
-            // No timezone info - interpret as Berlin time and convert to UTC
-            // Format: "2025-01-15T20:30:00" -> treat as 20:30 Berlin time
-            nextRun = parseNaiveDateTimeAsBerlin(nextRunStr);
+            // No timezone info - interpret as configured timezone and convert to UTC
+            // Format: "2025-01-15T20:30:00" -> treat as 20:30 configured timezone
+            nextRun = parseNaiveDateTimeAsConfiguredTimezone(nextRunStr);
         }
         if (!Number.isNaN(nextRun.getTime()) && nextRun <= now) {
             console.log(`🗓️  ✅ Task "${t.task_name}" is DUE! next_run=${nextRun.toISOString()}, now=${now.toISOString()}`);
@@ -369,30 +364,30 @@ async function updateRecurringTask(task) {
         }
         else if (schedule === 'daily') {
             newNext.setUTCDate(now.getUTCDate() + 1);
-            // If task has time field (e.g. "07:30"), use it as Berlin time
+            // If task has time field (e.g. "07:30"), use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (schedule === 'weekly') {
             newNext.setUTCDate(now.getUTCDate() + 7);
-            // If task has time field (e.g. "18:00"), use it as Berlin time
+            // If task has time field (e.g. "18:00"), use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (schedule === 'monthly') {
             newNext.setUTCMonth(now.getUTCMonth() + 1);
-            // If task has time field, use it as Berlin time
+            // If task has time field, use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (schedule === 'yearly') {
             newNext.setUTCFullYear(now.getUTCFullYear() + 1);
-            // If task has time field, use it as Berlin time
+            // If task has time field, use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (/^every_\d+_minutes$/.test(schedule)) {
@@ -406,17 +401,17 @@ async function updateRecurringTask(task) {
         else if (/^every_\d+_days$/.test(schedule)) {
             const days = parseInt(schedule.split('_')[1] || '0', 10) || 0;
             newNext.setUTCDate(now.getUTCDate() + days);
-            // If task has time field, use it as Berlin time
+            // If task has time field, use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (/^every_\d+_weeks$/.test(schedule)) {
             const weeks = parseInt(schedule.split('_')[1] || '0', 10) || 0;
             newNext.setUTCDate(now.getUTCDate() + (weeks * 7));
-            // If task has time field, use it as Berlin time
+            // If task has time field, use it as configured timezone
             if (hasTimeField && task.time) {
-                newNext = parseTimeInBerlinThenUTC(task.time, newNext);
+                newNext = parseTimeInConfiguredTimezone(task.time, newNext);
             }
         }
         else if (schedule.startsWith('tomorrow_at_')) {
@@ -424,7 +419,7 @@ async function updateRecurringTask(task) {
             const timeStr = schedule.replace('tomorrow_at_', '');
             if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
                 newNext.setUTCDate(now.getUTCDate() + 1);
-                newNext = parseTimeInBerlinThenUTC(timeStr, newNext);
+                newNext = parseTimeInConfiguredTimezone(timeStr, newNext);
             }
             else {
                 // Fallback: just add one day
@@ -436,11 +431,11 @@ async function updateRecurringTask(task) {
             const timeStr = schedule.replace('today_at_', '');
             if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
                 // Keep same date, just set time
-                newNext = parseTimeInBerlinThenUTC(timeStr, newNext);
+                newNext = parseTimeInConfiguredTimezone(timeStr, newNext);
                 // If time already passed today, schedule for tomorrow
                 if (newNext <= now) {
                     newNext.setUTCDate(newNext.getUTCDate() + 1);
-                    newNext = parseTimeInBerlinThenUTC(timeStr, newNext);
+                    newNext = parseTimeInConfiguredTimezone(timeStr, newNext);
                 }
             }
             else {
