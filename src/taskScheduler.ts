@@ -126,7 +126,10 @@ function parseTimeInConfiguredTimezone(timeStr: string, referenceDate: Date): Da
     if (diffMinutes > 12 * 60) diffMinutes -= 24 * 60;
     if (diffMinutes < -12 * 60) diffMinutes += 24 * 60;
 
-    testUTC = new Date(testUTC.getTime() - diffMinutes * 60 * 1000);
+    // Add the difference to move UTC time so local time matches target
+    // Example: If target is 14:00 NY and testUTC shows 09:00 NY, diffMinutes=+300
+    // We need to add 5 hours to UTC so that when converted to NY time, it shows 14:00
+    testUTC = new Date(testUTC.getTime() + diffMinutes * 60 * 1000);
   }
 
   return testUTC;
