@@ -366,7 +366,7 @@ This is your scheduled heartbeat - a moment of autonomy where YOU decide what yo
 - Research topics that interest you or relate to recent conversations
 - Journal thoughts, insights, or reflections to archival memory
 - Search past memories and conversations for connections
-- Send a meaningful message to the user (only if you have real value to add)
+- Send a meaningful message to Angela (only if you have real value to add)
 - Or do nothing - if nothing feels valuable right now, that's fine
 
 ## Remember:
