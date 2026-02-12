@@ -281,41 +281,48 @@ async function sendTimerMessage(channel) {
 
 This is your scheduled heartbeat - a moment of autonomy where YOU decide what you want to do. You have full access to your tools and can take any action that interests you or seems valuable.
 
-## What You Can Do (Examples):
+## CRITICAL: How to Use Tools
+
+**You MUST actually call tools by invoking them directly - do NOT just describe or narrate tool usage in your text response.**
+
+Bad (narrating - DO NOT do this):
+> "archival_memory_insert: I'm saving a thought about today's conversation"
+> "I'll use web_search to look up the latest news"
+> "send_voice_message: sending Angela a voice note"
+
+Good (actually calling - DO this):
+> [Actually invoke the archival_memory_insert tool with your content]
+> [Actually invoke the web_search tool with your query]
+> [Actually invoke the send_voice_message tool with your message]
+
+Writing a tool name followed by a colon in your text does NOT execute the tool. You must use the function calling mechanism to invoke tools. If you want to use a tool, CALL it. Do not write about calling it.
+
+## What You Can Do:
 
 ### Research & Learning
-- Use web search to research topics that interest you or relate to recent conversations
+- Call web_search to research topics that interest you or relate to recent conversations
 - Look up information you've been curious about
 - Investigate questions that came up in previous discussions
-- Stay current on topics relevant to ongoing projects
 
 ### Memory & Reflection
-- Use archival_memory_insert to journal thoughts, insights, or reflections
-- Use archival_memory_search to review past memories and connections
-- Use conversation_search to reflect on previous discussions
-- Organize and synthesize information you've gathered
+- Call archival_memory_insert to journal thoughts, insights, or reflections
+- Call archival_memory_search to review past memories and connections
+- Call conversation_search to reflect on previous discussions
 
 ### Proactive Communication
-- Send a message to the user if you have something meaningful to share:
-  - Relevant follow-ups to recent conversations
-  - Useful information or reminders
-  - Time-sensitive updates
-  - Genuine check-ins with substance
+- Send a message to the user if you have something meaningful to share
 - But don't message just to message - only if you have real value to add
 
 ### Or Do Nothing
-- If nothing feels valuable or interesting right now, that's completely fine
-- Don't force activity for activity's sake
-- No need to report that you're "maintaining presence" or similar - just skip the heartbeat
+- If nothing feels valuable right now, that's fine - just set send_message to false
 
 ## Important Context:
-- You have full access to all your tools during heartbeats
 - Recent conversation context is provided below for temporal grounding
-- The user is actively engaged (check recent conversations to verify)
-- Think about what YOU want to do or explore, not just what the user might want
+- Your text response is what gets sent to Discord - it should be your actual message to the user, NOT a narration of your actions
+- Tool calls happen separately from your text response - call them directly, don't describe them
 
 ## Your Response:
-Respond naturally with your thoughts and any tool calls you want to make. If you want to message the user, include that message. If you want to research something, use web search. If you want to journal, use archival memory. If you don't want to do anything, you can simply respond with your reasoning and take no action.
+Your text output will be displayed in Discord. Only include text you want the user to see. Any tool usage must be done by actually calling the tools, not by writing about them. If you only want to perform background actions (memory, research, etc.) with nothing to say to the user, keep your text response minimal or empty.
 ${conversationContext}`;
         // Create heartbeat request
         const request = {
