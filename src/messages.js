@@ -281,41 +281,17 @@ async function sendTimerMessage(channel) {
 
 This is your scheduled heartbeat - a moment of autonomy where YOU decide what you want to do. You have full access to your tools and can take any action that interests you or seems valuable.
 
-## What You Can Do (Examples):
+## Ideas:
+- Research topics that interest you or relate to recent conversations
+- Journal thoughts, insights, or reflections to archival memory
+- Search past memories and conversations for connections
+- Send a meaningful message to the user (only if you have real value to add)
+- Or do nothing - if nothing feels valuable right now, that's fine
 
-### Research & Learning
-- Use web search to research topics that interest you or relate to recent conversations
-- Look up information you've been curious about
-- Investigate questions that came up in previous discussions
-- Stay current on topics relevant to ongoing projects
-
-### Memory & Reflection
-- Use archival_memory_insert to journal thoughts, insights, or reflections
-- Use archival_memory_search to review past memories and connections
-- Use conversation_search to reflect on previous discussions
-- Organize and synthesize information you've gathered
-
-### Proactive Communication
-- Send a message to the user if you have something meaningful to share:
-  - Relevant follow-ups to recent conversations
-  - Useful information or reminders
-  - Time-sensitive updates
-  - Genuine check-ins with substance
-- But don't message just to message - only if you have real value to add
-
-### Or Do Nothing
-- If nothing feels valuable or interesting right now, that's completely fine
-- Don't force activity for activity's sake
-- No need to report that you're "maintaining presence" or similar - just skip the heartbeat
-
-## Important Context:
-- You have full access to all your tools during heartbeats
-- Recent conversation context is provided below for temporal grounding
-- The user is actively engaged (check recent conversations to verify)
-- Think about what YOU want to do or explore, not just what the user might want
-
-## Your Response:
-Respond naturally with your thoughts and any tool calls you want to make. If you want to message the user, include that message. If you want to research something, use web search. If you want to journal, use archival memory. If you don't want to do anything, you can simply respond with your reasoning and take no action.
+## Remember:
+- Use your tools directly as described in your system instructions - do not narrate tool usage in your text
+- Your text response is what gets displayed in Discord
+- If you only want to perform background actions with nothing to say, keep your text empty
 ${conversationContext}`;
         // Create heartbeat request
         const request = {
