@@ -24,6 +24,8 @@ const ALERT_CHANNEL_ID = process.env.LETTA_ALERT_CHANNEL_ID || ''; // Configure 
 const ALERT_THRESHOLD_EUR = 5.0; // Alert when 5€ reached
 const EUR_RATE = 0.92; // USD to EUR conversion
 const CREDIT_PRICE_USD = 0.001; // $0.001 per credit
+const LOCALE = process.env.LOCALE || 'en-US';
+const LOCALE_TIMEZONE = process.env.TIMEZONE || 'America/New_York';
 
 // State
 let dailySummaryScheduled = false;
@@ -325,11 +327,12 @@ export async function sendDailySummary(client: Client): Promise<void> {
     const channel = await client.channels.fetch(ALERT_CHANNEL_ID) as TextChannel;
     
     if (channel) {
-      const dateStr = yesterday.toLocaleDateString('de-DE', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const dateStr = yesterday.toLocaleDateString(LOCALE, {
+        timeZone: LOCALE_TIMEZONE,
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
 
       const summary = `📊 **Tägliches Letta Summary - ${dateStr}**
@@ -380,23 +383,23 @@ export function startDailySummaryScheduler(client: Client): void {
     const now = new Date();
     
     // Get configured timezone time
-    const berlinTime = new Intl.DateTimeFormat('en-US', {
+    const localTimeParts = new Intl.DateTimeFormat('en-US', {
       timeZone: TIMEZONE,
       hour: 'numeric',
       minute: 'numeric',
       hour12: false
     }).formatToParts(now);
-    
-    const hour = parseInt(berlinTime.find(p => p.type === 'hour')?.value || '0', 10);
-    const minute = parseInt(berlinTime.find(p => p.type === 'minute')?.value || '0', 10);
-    
+
+    const hour = parseInt(localTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const minute = parseInt(localTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
+
     // Calculate milliseconds until next midnight (configured timezone)
-    const berlinNow = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
-    const berlinMidnight = new Date(berlinNow);
-    berlinMidnight.setHours(0, 0, 0, 0);
-    berlinMidnight.setDate(berlinMidnight.getDate() + 1); // Next midnight
-    
-    const msUntilMidnight = berlinMidnight.getTime() - berlinNow.getTime();
+    const localNow = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
+    const localMidnight = new Date(localNow);
+    localMidnight.setHours(0, 0, 0, 0);
+    localMidnight.setDate(localMidnight.getDate() + 1); // Next midnight
+
+    const msUntilMidnight = localMidnight.getTime() - localNow.getTime();
     
     console.log(`⏰ Next daily summary scheduled in ${Math.floor(msUntilMidnight / 1000 / 60)} minutes (at 0:00 ${TIMEZONE})`);
     

@@ -269,7 +269,7 @@ client.once('ready', async () => {
     // Start Letta stats monitoring (daily summary + threshold alerts)
     (0, lettaStatsMonitor_1.startDailySummaryScheduler)(client);
     await (0, lettaStatsMonitor_1.startThresholdMonitoring)(client);
-    // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 Berlin time
+    // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 configured timezone
     (0, dailyStatsSummary_1.startDailyStatsSummaryScheduler)(client);
     // 🎤 Initialize ElevenLabs voice generation service
     if (elevenLabsService) {

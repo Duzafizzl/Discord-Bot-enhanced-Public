@@ -74,8 +74,8 @@ async function sendMessage(
     });
 
     const formatted = dateFormatter.format(now);
-    const berlinTime = formatted.replace(/^(\w+)\./, '$1');
-    timestampString = `, time=${berlinTime}`;
+    const localTime = formatted.replace(/^(\w+)\./, '$1');
+    timestampString = `, time=${localTime}`;
   } catch (err) {
     console.error('⚠️ Timestamp generation failed:', err instanceof Error ? err.message : err);
     timestampString = '';

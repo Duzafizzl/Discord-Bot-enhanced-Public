@@ -88,23 +88,23 @@ export function startDailyStatsSummaryScheduler(client: Client): void {
     const now = new Date();
     
     // Get configured timezone time
-    const berlinTime = new Intl.DateTimeFormat("en-US", {
+    const localTimeParts = new Intl.DateTimeFormat("en-US", {
       timeZone: TIMEZONE,
       hour: "numeric",
       minute: "numeric",
       hour12: false,
     }).formatToParts(now);
-    
-    const hour = parseInt(berlinTime.find((p) => p.type === "hour")?.value || "0", 10);
-    const minute = parseInt(berlinTime.find((p) => p.type === "minute")?.value || "0", 10);
-    
+
+    const hour = parseInt(localTimeParts.find((p) => p.type === "hour")?.value || "0", 10);
+    const minute = parseInt(localTimeParts.find((p) => p.type === "minute")?.value || "0", 10);
+
     // Calculate milliseconds until next midnight (configured timezone)
-    const berlinNow = new Date(now.toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const berlinMidnight = new Date(berlinNow);
-    berlinMidnight.setHours(0, 0, 0, 0);
-    berlinMidnight.setDate(berlinMidnight.getDate() + 1); // Next midnight
-    
-    const msUntilMidnight = berlinMidnight.getTime() - berlinNow.getTime();
+    const localNow = new Date(now.toLocaleString("en-US", { timeZone: TIMEZONE }));
+    const localMidnight = new Date(localNow);
+    localMidnight.setHours(0, 0, 0, 0);
+    localMidnight.setDate(localMidnight.getDate() + 1); // Next midnight
+
+    const msUntilMidnight = localMidnight.getTime() - localNow.getTime();
     
     console.log(
       `⏰ Next daily stats summary scheduled in ${Math.floor(msUntilMidnight / 1000 / 60)} minutes (at 0:00 ${TIMEZONE})`

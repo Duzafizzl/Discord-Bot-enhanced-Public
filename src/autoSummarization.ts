@@ -50,6 +50,10 @@ const ENABLE_AUTO_SUMMARIZATION = process.env.ENABLE_AUTO_SUMMARIZATION === 'tru
 // Admin channel for notifications (optional)
 const ADMIN_CHANNEL_ID = process.env.ADMIN_CHANNEL_ID;
 
+// Timezone and locale for consistent date formatting
+const TIMEZONE = process.env.TIMEZONE || 'America/New_York';
+const LOCALE = process.env.LOCALE || 'en-US';
+
 // ==========================================
 // STATE MANAGEMENT
 // ==========================================
@@ -129,7 +133,7 @@ async function triggerAutoSummarization(
 ║ Current Messages: ${currentMessageCount}
 ║ Threshold: ${AUTO_SUMMARIZE_THRESHOLD}
 ║ Target: ${AUTO_SUMMARIZE_TARGET} messages
-║ Time: ${new Date().toLocaleString('de-DE')}
+║ Time: ${new Date().toLocaleString(LOCALE, { timeZone: TIMEZONE })}
 ╚══════════════════════════════════════════════════════`);
 
     // Notify admin channel if configured
@@ -143,7 +147,7 @@ async function triggerAutoSummarization(
               '',
               `📊 Current: ${currentMessageCount} messages`,
               `🎯 Target: ${AUTO_SUMMARIZE_TARGET} messages`,
-              `⏰ Time: ${new Date().toLocaleTimeString('de-DE')}`,
+              `⏰ Time: ${new Date().toLocaleTimeString(LOCALE, { timeZone: TIMEZONE })}`,
               '',
               '_This may take 5-10 seconds..._',
             ].join('\n'),
@@ -189,7 +193,7 @@ async function triggerAutoSummarization(
 ║ Before: ${currentMessageCount} messages
 ║ After: ${afterCount || 'unknown'} messages
 ║ Status: ${success ? 'SUCCESS' : 'PARTIAL'}
-║ Time: ${new Date().toLocaleString('de-DE')}
+║ Time: ${new Date().toLocaleString(LOCALE, { timeZone: TIMEZONE })}
 ╚══════════════════════════════════════════════════════`);
 
     // Notify admin channel of result
@@ -219,7 +223,7 @@ async function triggerAutoSummarization(
 ╔══════════════════════════════════════════════════════
 ║ ❌ AUTO-SUMMARIZATION FAILED
 ║ Error: ${error.message}
-║ Time: ${new Date().toLocaleString('de-DE')}
+║ Time: ${new Date().toLocaleString(LOCALE, { timeZone: TIMEZONE })}
 ╚══════════════════════════════════════════════════════`);
 
     // Notify admin channel of failure
@@ -341,7 +345,7 @@ export function getAutoSummarizationStats(): {
     messagesSinceLastCheck: messagesSinceLastCheck,
     lastRunTime:
       lastSummarizationTime > 0
-        ? new Date(lastSummarizationTime).toLocaleString('de-DE')
+        ? new Date(lastSummarizationTime).toLocaleString(LOCALE, { timeZone: TIMEZONE })
         : null,
     nextCheckIn: AUTO_SUMMARIZE_CHECK_FREQUENCY - messagesSinceLastCheck,
   };

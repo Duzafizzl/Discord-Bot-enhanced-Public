@@ -310,7 +310,7 @@ client.once('ready', async () => {
   startDailySummaryScheduler(client);
   await startThresholdMonitoring(client);
   
-  // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 Berlin time
+  // Start daily stats summary (Letta + Chat Stats) - runs at 0:00 configured timezone
   startDailyStatsSummaryScheduler(client);
 
   // 🎤 Initialize ElevenLabs voice generation service
