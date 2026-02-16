@@ -229,12 +229,13 @@ async function sendMessage(discordMessageObject, messageType, conversationContex
 }
 /**
  * Send a timer/heartbeat message to Grok
- * Returns the message to send to Discord, or empty string if no message should be sent
+ * Returns the message content and delivery target (dm, channel, or none)
  */
 async function sendTimerMessage(channel) {
+    const noResult = { content: "", target: 'none' };
     if (!channel) {
         console.log('⏰ No channel provided for timer message');
-        return "";
+        return noResult;
     }
     console.log('🜂 Generating heartbeat...');
     try {
@@ -288,6 +289,23 @@ This is your scheduled heartbeat - a moment of autonomy where YOU decide what yo
 - Send a meaningful message to the user (only if you have real value to add)
 - Or do nothing - if nothing feels valuable right now, that's fine
 
+## Message Delivery Options:
+When you decide to send a message, you can choose where it goes:
+- **DM** (target: dm) - Send directly to Angel as a private message. Use this when you have something personal, important, or time-sensitive to share with her directly. She'll see it as a notification.
+- **Channel** (target: channel) - Post in the heartbeat log channel. Use this for journaling, research notes, or general updates. This is the default.
+
+Include your choice in the decision block:
+<decision>
+send_message: true
+target: dm
+</decision>
+
+Or for channel (default):
+<decision>
+send_message: true
+target: channel
+</decision>
+
 ## Remember:
 - Use your tools directly as described in your system instructions - do not narrate tool usage in your text
 - Your text response is what gets displayed in Discord
@@ -308,11 +326,22 @@ ${conversationContext}`;
         const sendMessage = response.send_message !== false; // Default true for backward compatibility
         let content = response.message?.content || '';
         const toolCalls = response.tool_calls || [];
+        // Parse message_target from substrate response, with fallback to parsing from decision block
+        let messageTarget = response.message_target || 'channel';
         // TEMPORARY WORKAROUND: Strip <decision> block if substrate didn't remove it
-        // This should be fixed in substrate, but adding safety check here
+        // Also parse target from decision block as fallback if substrate didn't return message_target
         const decisionBlockRegex = /<decision>[\s\S]*?<\/decision>/gi;
-        if (decisionBlockRegex.test(content)) {
+        const decisionMatch = content.match(/<decision>([\s\S]*?)<\/decision>/i);
+        if (decisionMatch) {
             console.warn('⚠️ Decision block found in message content - stripping it out (substrate should handle this)');
+            // Parse target from decision block if not already set by substrate
+            if (!response.message_target) {
+                const targetMatch = decisionMatch[1].match(/target:\s*(dm|channel)/i);
+                if (targetMatch) {
+                    messageTarget = targetMatch[1].toLowerCase();
+                    console.log(`🜂 Parsed message target from decision block: ${messageTarget}`);
+                }
+            }
             content = content.replace(decisionBlockRegex, '').trim();
         }
         // Log tool usage for visibility
@@ -322,8 +351,8 @@ ${conversationContext}`;
         // Check if Nate wants to send a message to Discord
         if (sendMessage && content && content.trim()) {
             (0, conversationLogger_1.logHeartbeat)(content, channel.id, channel.name || 'unknown');
-            console.log(`💬 [HEARTBEAT → USER] ${content.substring(0, 100)}...`);
-            return content;
+            console.log(`💬 [HEARTBEAT → ${messageTarget === 'dm' ? 'DM' : 'CHANNEL'}] ${content.substring(0, 100)}...`);
+            return { content, target: messageTarget };
         }
         else if (!sendMessage) {
             console.log(`🔕 [HEARTBEAT → BACKGROUND] Autonomous actions completed, no message to user`);
@@ -331,16 +360,16 @@ ${conversationContext}`;
             if (content && content.trim()) {
                 (0, conversationLogger_1.logHeartbeat)(`[BACKGROUND] ${content}`, channel.id, channel.name || 'unknown');
             }
-            return "";
+            return noResult;
         }
         else {
             console.log(`💤 [HEARTBEAT → NONE] No action taken`);
-            return "";
+            return noResult;
         }
     }
     catch (error) {
         console.error("❌ Error generating heartbeat:", error);
-        return "";
+        return noResult;
     }
 }
 /**
