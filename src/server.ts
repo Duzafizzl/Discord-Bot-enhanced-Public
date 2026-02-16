@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
-import { sendMessage, sendTimerMessage, MessageType } from './messages';
+import { sendMessage, sendTimerMessage, MessageType, HeartbeatResult } from './messages';
 import { registerAttachmentForwarder } from './attachmentForwarder';
 import { GrokClient } from './grokClient';
 import { startTaskCheckerLoop } from './taskScheduler';
@@ -420,29 +420,51 @@ async function startRandomEventTimer(): Promise<void> {
       }
       
       // 💰 ONLY make API call if probability check passed!
-      const msg = await sendTimerMessage(channel);
+      const heartbeatResult = await sendTimerMessage(channel);
 
-      if (msg !== "" && channel) {
+      if (heartbeatResult.content && heartbeatResult.target !== 'none') {
         try {
-          // 📦 CHUNKING: Split long messages to avoid Discord's 2000 char limit
-          if (msg.length <= 1900) {
-            await channel.send(msg);
-            console.log("🜂 Heartbeat message sent to channel");
-          } else {
-            const chunks = chunkText(msg, 1900);
-            await channel.send(chunks[0]);
+          let sendChannel: any = channel;
 
-            for (let i = 1; i < chunks.length; i++) {
-              await new Promise(r => setTimeout(r, 200));
-              await channel.send(chunks[i]);
+          // 💬 Route to DM if Nate chose to send a direct message
+          if (heartbeatResult.target === 'dm' && ALLOWED_DM_USER_ID) {
+            try {
+              const user = await client.users.fetch(ALLOWED_DM_USER_ID);
+              sendChannel = await user.createDM();
+              console.log(`🜂 Routing heartbeat to DM for user ${user.username}`);
+            } catch (dmError) {
+              console.error(`🜂 Failed to create DM channel, falling back to heartbeat log channel:`, dmError instanceof Error ? dmError.message : String(dmError));
+              sendChannel = channel; // fallback to heartbeat log channel
             }
+          } else if (heartbeatResult.target === 'dm' && !ALLOWED_DM_USER_ID) {
+            console.warn('🜂 Heartbeat requested DM but ALLOWED_DM_USER_ID is not set, falling back to channel');
+          }
 
-            console.log(`🜂 Heartbeat message sent in ${chunks.length} chunks (total: ${msg.length} chars)`);
+          const msg = heartbeatResult.content;
+
+          // 📦 CHUNKING: Split long messages to avoid Discord's 2000 char limit
+          if (sendChannel) {
+            if (msg.length <= 1900) {
+              await sendChannel.send(msg);
+              console.log(`🜂 Heartbeat message sent to ${heartbeatResult.target === 'dm' && ALLOWED_DM_USER_ID ? 'DM' : 'channel'}`);
+            } else {
+              const chunks = chunkText(msg, 1900);
+              await sendChannel.send(chunks[0]);
+
+              for (let i = 1; i < chunks.length; i++) {
+                await new Promise(r => setTimeout(r, 200));
+                await sendChannel.send(chunks[i]);
+              }
+
+              console.log(`🜂 Heartbeat message sent in ${chunks.length} chunks (total: ${msg.length} chars) to ${heartbeatResult.target === 'dm' && ALLOWED_DM_USER_ID ? 'DM' : 'channel'}`);
+            }
+          } else {
+            console.log("🜂 No channel available to send heartbeat message");
           }
         } catch (error) {
           console.error("🜂 Error sending heartbeat message:", error);
         }
-      } else if (msg === "" && channel) {
+      } else if (!heartbeatResult.content && channel) {
         console.log("🜂 Heartbeat completed - autonomous actions taken, no message to Discord");
       } else if (!channel) {
         console.log("🜂 No CHANNEL_ID defined or channel not available; message not sent.");

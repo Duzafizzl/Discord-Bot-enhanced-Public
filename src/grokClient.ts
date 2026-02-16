@@ -49,6 +49,8 @@ export interface GrokChatResponse {
   // If send_message is false, the Discord bot will not send anything to Discord
   // This allows Nate to use tools (search, memory, voice notes, images, etc.) without messaging the user
   send_message?: boolean;  // Default: true for backward compatibility
+  // Where to deliver the heartbeat message: 'dm' sends a DM to the user, 'channel' posts in heartbeat log channel
+  message_target?: 'dm' | 'channel';  // Default: 'channel'
 }
 
 export interface GrokStreamChunk {
