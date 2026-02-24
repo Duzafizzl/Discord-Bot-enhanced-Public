@@ -342,6 +342,22 @@ async function triggerLetta(
       return false; // Task triggered but no response = failure
     }
     
+    // 🔧 FIX: Actually send the task response to Discord (was previously silently discarded)
+    if (targetChannel && taskResponse.trim()) {
+      try {
+        // Discord has a 2000 char limit - chunk if needed
+        const chunks = taskResponse.match(/[\s\S]{1,1990}/g) || [];
+        for (const chunk of chunks) {
+          await targetChannel.send(chunk);
+        }
+        console.log(`🗓️  📨 [${new Date().toISOString()}] Sent task response to Discord (${taskResponse.length} chars, ${chunks.length} chunk(s))`);
+      } catch (sendError) {
+        console.error(`🗓️  ❌ [${new Date().toISOString()}] Failed to send task response to Discord:`, sendError);
+      }
+    } else if (!targetChannel) {
+      console.warn(`🗓️  ⚠️  [${new Date().toISOString()}] Task "${taskName}" got response (${taskResponse.length} chars) but no target channel available to deliver it`);
+    }
+
     console.log(`🗓️  ✅ [${new Date().toISOString()}] Triggered Letta successfully: "${taskName}" (msg_id=${taskMsgId}) - received ${taskResponse.length} chars`);
     return true;
   } catch (e: any) {
